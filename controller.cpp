@@ -18,7 +18,9 @@ namespace controller
 		//Take in state of ardrone
 		msg_in_global = msg_in;
 	}
-	void Controller::takeoff
+	void Controller::takeoff(){
+		pub_empty_takeoff.publish(emp_msg);
+	}
 	void Controller::begin(){
 		double time_start=(double)ros::Time::now().toSec();
  		while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+1)){
