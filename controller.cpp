@@ -13,6 +13,14 @@
 #define KP_Y 0.1
 #define KP_ROT 0
 
+//Husk at dobbelttjek disse værdier
+#define GAMMA_X = 40 //grader
+#define GAMMA_Y = 64
+#define PIXEL_DIST_X = 180 //pixels
+#define PIXEL_DIST_Y = 320
+
+
+
 namespace controller
 {
 	Kp = {0.1,0.1,1/6.28,0};
@@ -66,13 +74,13 @@ namespace controller
     
     double Controller::getPosX(int pixErrorX){
         double alphaX = ((msg_in_global.rotY*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
-        double betaX = -atan(tan(gammaX/2)*(pixErrorX)/pixelDistX);
+        double betaX = -atan(tan(GAMMA_X/2)*(pixErrorX)/PIXEL_DIST_X);
         double height = 1;//;msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
         return height * tan(alphaX+betaX);
     }
     double Controller::getPosY(int pixErrorY){
         double alphaY = ((msg_in_global.rotX*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
-        double betaY = -atan(tan(gammaY/2)*(pixErrorY)/pixelDistY);
+        double betaY = -atan(tan(GAMMA_Y/2)*(pixErrorY)/PIXEL_DIST_Y);
         double height = 1;//msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
         return height * tan(alphaY+betaY);
     }
