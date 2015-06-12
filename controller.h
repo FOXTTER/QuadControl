@@ -22,6 +22,7 @@ namespace controller{
 			void land();
 			void control(int dt);
 			void begin();
+			void update_state();
 
 
 		//private:

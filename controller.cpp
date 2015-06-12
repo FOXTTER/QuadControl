@@ -9,13 +9,16 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-
+#define KP_X 0.1
+#define KP_Y 0.1
+#define KP_ROT 0
 
 namespace controller
 {
+	Kp = {0.1,0.1,1/6.28,0};
 	void Controller::nav_callback(const ardrone_autonomy::Navdata& msg_in)
 	{
-		//Take in state of ardrone
+		//Take in navdata from ardrone
 		msg_in_global = msg_in;
 	}
 	void Controller::takeoff(){
@@ -27,6 +30,10 @@ namespace controller
  			ros::spinOnce();
  		}
 	}
+	void Controller::update_state()
+	{
+		measured
+	}
 
 	Controller::Controller()
 	{
@@ -37,4 +44,8 @@ namespace controller
 		pub_empty_reset = node.advertise<std_msgs::Empty>("/ardrone/reset", 1); /* Message queue length is just 1 */
 	}
 
+	void Controller::control(int dt)
+	 {
+
+	 }
 }
