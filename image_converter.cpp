@@ -9,8 +9,8 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-//#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
-#define IMAGE_PATH "/image_raw" //Webcam
+#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
+//#define IMAGE_PATH "/image_raw" //Webcam
 namespace image_converter
 {
   //image_transport::Subscriber image_sub_;
@@ -24,7 +24,6 @@ namespace image_converter
   ImageConverter::ImageConverter()
     : it_(nh_)
   {
-    ROS_INFO("Test");
     testCount = 0;
     // Subscrive to input video feed and publish output video feed
     image_sub_ = it_.subscribe(IMAGE_PATH, 1, 

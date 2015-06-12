@@ -52,6 +52,7 @@ using namespace cv;
 using namespace std;
 using namespace image_converter;
 using namespace controller;
+#define DT 0.1
 
 static string WIN_NAME = "CMT";
 
@@ -100,10 +101,10 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "test");
     ImageConverter ic;
     Controller reg;
-    ros::Rate r(30); // 10 hz
+    ros::Rate r(1/DT); // 10 hz
     ros::spinOnce();
     //Create a CMT object
-    reg.begin();
+    reg.wait(1.0);
 
     CMT cmt;
 
@@ -305,6 +306,12 @@ int main(int argc, char **argv)
         return -1;
     }*/
 
+    //Reset quadcopter
+    reg.reset();
+    //Takeoff
+    reg.takeoff();
+    reg.auto_hover();
+
     //Show preview until key is pressed
     while (show_preview)
     {
@@ -344,7 +351,8 @@ int main(int argc, char **argv)
     int frame = 0;
 
     //Main loop
-    while (ros::ok())
+    double time_start=(double)ros::Time::now().toSec();
+    while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+10))
     {
     	ros::spinOnce();
         frame++;
@@ -361,6 +369,10 @@ int main(int argc, char **argv)
         //Let CMT process the frame
         Point2f center = cmt.processFrame(im_gray);
         circle( im, center, 5, Scalar(0,0,255), -1, 8, 0 );
+        line(im, Point(0,180),Point(640,180),Scalar(0,255,0),1,8,0);
+        line(im, Point(320,0),Point(320,360),Scalar(0,255,0),1,8,0);
+        reg.update_state(center);
+        reg.control(DT);
 
         char key = display(im, cmt);
 
@@ -370,6 +382,7 @@ int main(int argc, char **argv)
         FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
         r.sleep();
     }
+    reg.land();
 
     return 0;
 }
