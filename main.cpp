@@ -1,6 +1,7 @@
 #include "CMT.h"
 #include "gui.h"
 #include "image_converter.h"
+#include "controller.h"
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -50,6 +51,7 @@ using ::atof;
 using namespace cv;
 using namespace std;
 using namespace image_converter;
+using namespace controller;
 
 static string WIN_NAME = "CMT";
 
@@ -97,14 +99,11 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test");
     ImageConverter ic;
+    Controller reg;
     ros::Rate r(30); // 10 hz
     ros::spinOnce();
     //Create a CMT object
-
-    double time_start=(double)ros::Time::now().toSec();
- 	while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+1)){
- 		ros::spinOnce();
- 	}
+    reg.begin();
 
     CMT cmt;
 
