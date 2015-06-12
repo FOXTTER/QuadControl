@@ -102,7 +102,7 @@ int main(int argc, char **argv)
     //Create a CMT object
 
     double time_start=(double)ros::Time::now().toSec();
- 	while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+0.1)){
+ 	while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+1)){
  		ros::spinOnce();
  	}
 
@@ -315,7 +315,7 @@ int main(int argc, char **argv)
         preview = ic.src1;
         screenLog(preview, "Press a key to start selecting an object.");
         imshow(WIN_NAME, preview);
-        ROS_INFO("Count: %d",ic.testCount);
+        //ROS_INFO("Count: %d",ic.testCount);
         char k = waitKey(10);
         if (k != -1) {
             show_preview = false;
