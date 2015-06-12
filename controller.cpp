@@ -62,4 +62,18 @@ namespace controller
 	 {
 
 	 }
+    
+    
+    double Controller::getPosX(int pixErrorX){
+        double alphaX = ((msg_in_global.rotY*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
+        double betaX = -atan(tan(gammaX/2)*(pixErrorX)/pixelDistX);
+        double height = 1;//;msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
+        return height * tan(alphaX+betaX);
+    }
+    double Controller::getPosY(int pixErrorY){
+        double alphaY = ((msg_in_global.rotX*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
+        double betaY = -atan(tan(gammaY/2)*(pixErrorY)/pixelDistY);
+        double height = 1;//msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
+        return height * tan(alphaY+betaY);
+    }
 }

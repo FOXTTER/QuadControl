@@ -48,6 +48,9 @@ namespace controller{
 			double Ki[4];
 			double Kd[4];
 			void nav_callback(const ardrone_autonomy::Navdata& msg_in);
+        
+            double getPosX(int pixErrorX)
+            double getPosY(int pixErrorY);
 	};
 }
 
