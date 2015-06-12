@@ -9,23 +9,27 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-
+#define KP_X 0.1
+#define KP_Y 0.1
+#define KP_ROT 0
 
 namespace controller
 {
+	Kp = {0.1,0.1,1/6.28,0};
 	void Controller::nav_callback(const ardrone_autonomy::Navdata& msg_in)
 	{
-		//Take in state of ardrone
+		//Take in navdata from ardrone
 		msg_in_global = msg_in;
 	}
-	void Controller::takeoff
+	void Controller::takeoff(){
+		pub_empty_takeoff.publish(emp_msg);
+	}
 	void Controller::begin(){
 		double time_start=(double)ros::Time::now().toSec();
  		while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+1)){
  			ros::spinOnce();
  		}
 	}
-    
     void Controller::land(){
         pub_empty_land.publish(emp_msg);
     }
@@ -40,6 +44,11 @@ namespace controller
         }
     }
     
+	void Controller::update_state()
+	{
+		measured
+	}
+
 	Controller::Controller()
 	{
 		nav_sub = node.subscribe("/ardrone/navdata", 1, &Controller::nav_callback,this);
@@ -49,4 +58,8 @@ namespace controller
 		pub_empty_reset = node.advertise<std_msgs::Empty>("/ardrone/reset", 1); /* Message queue length is just 1 */
 	}
 
+	void Controller::control(int dt)
+	 {
+
+	 }
 }
