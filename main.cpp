@@ -1,5 +1,6 @@
 #include "CMT.h"
 #include "gui.h"
+#include "image_converter.h"
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -21,8 +22,6 @@
 //#include <stdio.h>
 #include <string>
 #include <math.h>
-//#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
-#define IMAGE_PATH "/image_raw" //Webcam
 
 //Slut
 
@@ -50,70 +49,13 @@ using std::endl;
 using ::atof;
 using namespace cv;
 using namespace std;
+using namespace image_converter;
 
 static string WIN_NAME = "CMT";
 
 /// Matrices to store images
-Mat src1;
+
 Mat dst;
-image_transport::Subscriber image_sub_;
-class ImageConverter
-{
-  ros::NodeHandle nh_;
-  image_transport::ImageTransport it_;
-  image_transport::Subscriber image_sub_;
-  image_transport::Publisher image_pub_;
-  
-public:
-
-  ImageConverter()
-    : it_(nh_)
-  {
-    // Subscrive to input video feed and publish output video feed
-    image_sub_ = it_.subscribe(IMAGE_PATH, 1, 
-      &ImageConverter::imageCb, this);
-    image_pub_ = it_.advertise("/image_converter/output_video", 1);
-  
-    //cv::namedWindow(OPENCV_WINDOW);
-  }
-
-  ~ImageConverter()
-  {
-    //cv::destroyWindow(OPENCV_WINDOW);w
-  }
-
-  void imageCb(const sensor_msgs::ImageConstPtr& msg)
-  {
-    cv_bridge::CvImagePtr cv_ptr;
-    try
-    {
-      cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-      ROS_ERROR("cv_bridge exception: %s", e.what());
-      return;
-    }
-
-    // Draw an example circle on the video stream
-    //if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
-    //  cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
-    
-    if (true)
-    {
-        src1 = cv_ptr->image;
-    }
-
-    // Update GUI Window
-    //cv::imshow(OPENCV_WINDOW, cv_ptr->image);
-    cv::waitKey(3);
-    
-    // Output modified video stream
-    image_pub_.publish(cv_ptr->toImageMsg());
-  }
-};
-
-
 
 vector<float> getNextLineAndSplitIntoFloats(istream& str)
 {
@@ -153,7 +95,6 @@ int display(Mat im, CMT & cmt)
 
 int main(int argc, char **argv)
 {
-
     ros::init(argc, argv, "test");
     ImageConverter ic;
     ros::Rate r(30); // 10 hz
@@ -371,10 +312,10 @@ int main(int argc, char **argv)
         ros::spinOnce();
         Mat preview;
         //cap >> preview;
-        preview = src1;
+        preview = ic.src1;
         screenLog(preview, "Press a key to start selecting an object.");
         imshow(WIN_NAME, preview);
-
+        ROS_INFO("Count: %d",ic.testCount);
         char k = waitKey(10);
         if (k != -1) {
             show_preview = false;
@@ -384,7 +325,7 @@ int main(int argc, char **argv)
     //Get initial image
     Mat im0;
     //cap >> im0;
-    im0 = src1.clone();
+    im0 = ic.src1.clone();
     //If no bounding was specified, get it from user
     if (!bbox_flag)
     {
@@ -413,7 +354,7 @@ int main(int argc, char **argv)
 
         //If loop flag is set, reuse initial image (for debugging purposes)
         if (loop_flag) im0.copyTo(im);
-        else im = src1;//cap >> im; //Else use next image in stream
+        else im = ic.src1;//cap >> im; //Else use next image in stream
 
         Mat im_gray;
         cvtColor(im, im_gray, CV_BGR2GRAY);
