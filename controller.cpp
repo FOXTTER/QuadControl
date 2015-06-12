@@ -11,7 +11,7 @@
 #include <highgui.h>
 #define KP_X 0.1
 #define KP_Y 0.1
-#define KP_ROT 1/6.28
+#define KP_ROT 0
 #define KP_Z 0
 #define X 0
 #define Y 1
