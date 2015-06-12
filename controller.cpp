@@ -73,5 +73,8 @@ namespace controller
       		output[i] = Kp[i]*error[i] + Ki[i] * integral[i] + Kd[i] * derivative[i];
       		previous_error[i] = error[i];
     	}
+    	twist_msg.angular.z= output[ROT];
+    	twist_msg.linear.x = output[X];
+    	twist_msg.linear.y = output[Y];
 	 }
 }
