@@ -8,6 +8,24 @@
 #include <fstream>
 #include <cstdio>
 
+//Vores libraries
+#include <ros/ros.h>
+#include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+#include <std_msgs/Empty.h>
+#include <ardrone_autonomy/Navdata.h>
+#include <geometry_msgs/Twist.h>
+#include <cv.h>
+#include <highgui.h>
+//#include <stdio.h>
+#include <string>
+#include <math.h>
+//#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
+#define IMAGE_PATH "/image_raw" //Webcam
+
+//Slut
+
 #ifdef __GNUC__
 #include <getopt.h>
 #else
@@ -30,8 +48,72 @@ using std::min_element;
 using std::max_element;
 using std::endl;
 using ::atof;
+using namespace cv;
+using namespace std;
 
 static string WIN_NAME = "CMT";
+
+/// Matrices to store images
+Mat src1;
+Mat dst;
+image_transport::Subscriber image_sub_;
+class ImageConverter
+{
+  ros::NodeHandle nh_;
+  image_transport::ImageTransport it_;
+  image_transport::Subscriber image_sub_;
+  image_transport::Publisher image_pub_;
+  
+public:
+
+  ImageConverter()
+    : it_(nh_)
+  {
+    // Subscrive to input video feed and publish output video feed
+    image_sub_ = it_.subscribe(IMAGE_PATH, 1, 
+      &ImageConverter::imageCb, this);
+    image_pub_ = it_.advertise("/image_converter/output_video", 1);
+  
+    //cv::namedWindow(OPENCV_WINDOW);
+  }
+
+  ~ImageConverter()
+  {
+    //cv::destroyWindow(OPENCV_WINDOW);w
+  }
+
+  void imageCb(const sensor_msgs::ImageConstPtr& msg)
+  {
+    cv_bridge::CvImagePtr cv_ptr;
+    try
+    {
+      cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+    }
+    catch (cv_bridge::Exception& e)
+    {
+      ROS_ERROR("cv_bridge exception: %s", e.what());
+      return;
+    }
+
+    // Draw an example circle on the video stream
+    //if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
+    //  cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
+    
+    if (true)
+    {
+        src1 = cv_ptr->image;
+    }
+
+    // Update GUI Window
+    //cv::imshow(OPENCV_WINDOW, cv_ptr->image);
+    cv::waitKey(3);
+    
+    // Output modified video stream
+    image_pub_.publish(cv_ptr->toImageMsg());
+  }
+};
+
+
 
 vector<float> getNextLineAndSplitIntoFloats(istream& str)
 {
@@ -71,7 +153,18 @@ int display(Mat im, CMT & cmt)
 
 int main(int argc, char **argv)
 {
+
+    ros::init(argc, argv, "test");
+    ImageConverter ic;
+    ros::Rate r(30); // 10 hz
+    ros::spinOnce();
     //Create a CMT object
+
+    double time_start=(double)ros::Time::now().toSec();
+ 	while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+0.1)){
+ 		ros::spinOnce();
+ 	}
+
     CMT cmt;
 
     //Initialization bounding box
@@ -252,7 +345,7 @@ int main(int argc, char **argv)
 
     bool show_preview = true;
 
-    //If no input was specified
+    /*//If no input was specified
     if (input_path.length() == 0)
     {
         cap.open(0); //Open default camera device
@@ -270,14 +363,15 @@ int main(int argc, char **argv)
     {
         cerr << "Unable to open video capture." << endl;
         return -1;
-    }
+    }*/
 
     //Show preview until key is pressed
     while (show_preview)
     {
+        ros::spinOnce();
         Mat preview;
-        cap >> preview;
-
+        //cap >> preview;
+        preview = src1;
         screenLog(preview, "Press a key to start selecting an object.");
         imshow(WIN_NAME, preview);
 
@@ -289,8 +383,8 @@ int main(int argc, char **argv)
 
     //Get initial image
     Mat im0;
-    cap >> im0;
-
+    //cap >> im0;
+    im0 = src1.clone();
     //If no bounding was specified, get it from user
     if (!bbox_flag)
     {
@@ -310,21 +404,23 @@ int main(int argc, char **argv)
     int frame = 0;
 
     //Main loop
-    while (true)
+    while (ros::ok())
     {
+    	ros::spinOnce();
         frame++;
 
         Mat im;
 
         //If loop flag is set, reuse initial image (for debugging purposes)
         if (loop_flag) im0.copyTo(im);
-        else cap >> im; //Else use next image in stream
+        else im = src1;//cap >> im; //Else use next image in stream
 
         Mat im_gray;
         cvtColor(im, im_gray, CV_BGR2GRAY);
 
         //Let CMT process the frame
-        cmt.processFrame(im_gray);
+        Point2f center = cmt.processFrame(im_gray);
+        circle( im, center, 5, Scalar(0,0,255), -1, 8, 0 );
 
         char key = display(im, cmt);
 
@@ -332,6 +428,7 @@ int main(int argc, char **argv)
 
         //TODO: Provide meaningful output
         FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
+        r.sleep();
     }
 
     return 0;

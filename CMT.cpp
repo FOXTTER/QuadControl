@@ -100,7 +100,7 @@ void CMT::initialize(const Mat im_gray, const Rect rect)
     FILE_LOG(logDEBUG) << "CMT::initialize() return";
 }
 
-void CMT::processFrame(Mat im_gray) {
+Point2f CMT::processFrame(Mat im_gray) {
 
     FILE_LOG(logDEBUG) << "CMT::processFrame() call";
 
@@ -188,6 +188,7 @@ void CMT::processFrame(Mat im_gray) {
     im_prev = im_gray;
 
     FILE_LOG(logDEBUG) << "CMT::processFrame() return";
+    return center;
 }
 
 } /* namespace CMT */
