@@ -25,7 +25,21 @@ namespace controller
  			ros::spinOnce();
  		}
 	}
-
+    
+    void Controller::land(){
+        pub_empty_land.publish(emp_msg);
+    }
+    
+    void Controller::reset(){
+        pub_empty_reset.publish(emp_msg);
+    }
+    
+    void Controller::init(){
+        while (msg_in_global.state != 1) {
+            Controller::reset();
+        }
+    }
+    
 	Controller::Controller()
 	{
 		nav_sub = node.subscribe("/ardrone/navdata", 1, &Controller::nav_callback,this);

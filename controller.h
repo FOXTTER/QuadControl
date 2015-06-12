@@ -19,6 +19,7 @@ namespace controller{
 			Controller();
 			void takeoff();
 			void reset();
+            void init();
 			void land();
 			void control(int dt);
 			void begin();
