@@ -96,6 +96,7 @@ void CMT::initialize(const Mat im_gray, const Rect rect)
         points_active.push_back(keypoints_fg[i].pt);
         classes_active = classes_fg;
     }
+    points_total = points_active.size();
 
     FILE_LOG(logDEBUG) << "CMT::initialize() return";
 }
@@ -186,6 +187,9 @@ Point2f CMT::processFrame(Mat im_gray) {
 
     //Remember current image
     im_prev = im_gray;
+
+    //Ratio of found points calculation
+    ratio = points_active.size() / points_total;
 
     FILE_LOG(logDEBUG) << "CMT::processFrame() return";
     return center;

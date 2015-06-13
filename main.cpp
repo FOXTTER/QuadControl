@@ -52,7 +52,7 @@ using namespace cv;
 using namespace std;
 using namespace image_converter;
 using namespace controller;
-#define DT 0.1
+#define DT 0.05
 
 static string WIN_NAME = "CMT";
 
@@ -94,6 +94,18 @@ int display(Mat im, CMT & cmt)
     imshow(WIN_NAME, im);
 
     return waitKey(5);
+}
+
+static void on_mouse( int event, int x, int y, int, void* )
+{
+    if(event == EVENT_RBUTTONDOWN) {
+        Controller reg;
+        reg.land();
+        throw exception();
+        return;
+    }
+    if( event != EVENT_LBUTTONDOWN )
+        return;
 }
 
 int main(int argc, char **argv)
@@ -281,6 +293,7 @@ int main(int argc, char **argv)
 
     //Create window
     namedWindow(WIN_NAME);
+    setMouseCallback(WIN_NAME, on_mouse,0);
 
     VideoCapture cap;
 
@@ -307,9 +320,11 @@ int main(int argc, char **argv)
     }*/
 
     //Reset quadcopter
-    reg.reset();
+    reg.init();
+    //reg.reset();
     //Takeoff
     reg.takeoff();
+    reg.elevate(1500);
     reg.auto_hover();
 
     //Show preview until key is pressed
@@ -352,8 +367,7 @@ int main(int argc, char **argv)
 
     //Main loop
     double time_start=(double)ros::Time::now().toSec();
-    while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+10))
-    {
+    while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+50)) {
     	ros::spinOnce();
         frame++;
 
@@ -372,14 +386,20 @@ int main(int argc, char **argv)
         line(im, Point(0,180),Point(640,180),Scalar(0,255,0),1,8,0);
         line(im, Point(320,0),Point(320,360),Scalar(0,255,0),1,8,0);
         reg.update_state(center);
-        reg.control(DT);
+        if(cmt.ratio > 0.5) {
+            reg.control(DT);
+        } else {
+            reg.auto_hover();
+        }
 
         char key = display(im, cmt);
 
         if(key == 'q') break;
 
         //TODO: Provide meaningful output
-        FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
+        //FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
+        //FILE_LOG(logINFO) << "#" << frame << " total: " << cmt.points_total;
+        //FILE_LOG(logINFO) << "#" << frame << " ratio: " << cmt.ratio;
         r.sleep();
     }
     reg.land();

@@ -19,6 +19,7 @@ namespace controller{
 	{
 		public:
 			Controller();
+			~Controller(){};
 			void takeoff();
 			void reset();
             void init();
@@ -27,6 +28,8 @@ namespace controller{
 			void wait(double tid);
 			void update_state(Point2f center);
 			void auto_hover();
+			void calibrate();
+			void elevate(double time);
 
 
 		//private:
@@ -36,6 +39,7 @@ namespace controller{
 			ros::Publisher pub_empty_takeoff;
 			ros::Publisher pub_empty_reset;
 			ros::Subscriber nav_sub;
+			ros::ServiceClient client;
 			geometry_msgs::Twist twist_msg;
 			geometry_msgs::Twist twist_msg_hover;
 			geometry_msgs::Twist twist_msg_pshover;
@@ -52,7 +56,7 @@ namespace controller{
 			vector<double> Kd;
 			vector<double> measured;
 			void nav_callback(const ardrone_autonomy::Navdata& msg_in);
-        
+        	struct Foo;
             double getPosX(int pixErrorX);
             double getPosY(int pixErrorY);
 	};

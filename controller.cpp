@@ -9,15 +9,19 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-#define KP_X 0.05
-#define KP_Y 0.05
+#define KP_X 0.07
+#define KP_Y 0.07
 #define KP_ROT 0.0
 #define KP_Z 0
+#define KI_X 0
+#define KI_Y 0
+#define KI_ROT 0.0
+#define KI_Z 0
 #define X 0
 #define Y 1
 #define ROT 2
 #define Z 3
-
+#define LANDED 2
 //Husk at dobbelttjek disse værdier
 #define GAMMA_X 40 //grader
 #define GAMMA_Y 64
@@ -36,6 +40,19 @@ namespace controller
 		msg_in_global = msg_in;
 	}
 
+	struct Foo
+	{
+	  class Request
+	  {
+	  };
+	
+	  class Response
+	  {
+	  };
+	
+	  Request request;
+	  Response response;
+	}; 
 	Controller::Controller()
 	:previous_error(4,0.0)
 	,error(4,0.0)
@@ -52,16 +69,25 @@ namespace controller
 		Kp[Y] = KP_Y;
 		Kp[ROT] = KP_ROT;
 		Kp[Z] = KP_Z;
+		Ki[X] = KI_X;
+		Ki[Y] = KI_Y;
+		Ki[ROT] = KI_ROT;
+		Ki[Z] = KI_Z;
 		nav_sub = node.subscribe("/ardrone/navdata", 1, &Controller::nav_callback,this);
 		pub_twist = node.advertise<geometry_msgs::Twist>("/cmd_vel", 1); /* Message queue length is just 1 */
 		pub_empty_takeoff = node.advertise<std_msgs::Empty>("/ardrone/takeoff", 1); /* Message queue length is just 1 */
 		pub_empty_land = node.advertise<std_msgs::Empty>("/ardrone/land", 1); /* Message queue length is just 1 */
 		pub_empty_reset = node.advertise<std_msgs::Empty>("/ardrone/reset", 1); /* Message queue length is just 1 */
+		//client = node.serviceClient<std_msgs::Empty>("/ardrone/flattrim");
 	}
 
 
 	void Controller::takeoff(){
 		pub_empty_takeoff.publish(emp_msg);
+	}
+	void Controller::calibrate(){
+		//Controller::Foo foo;
+		//ros::service::call("/ardrone/flattrim",foo);
 	}
 	void Controller::wait(double tid){
 		double time_start=(double)ros::Time::now().toSec();
@@ -78,22 +104,34 @@ namespace controller
     }
     
     void Controller::init(){
-        while (msg_in_global.state != 1) {
+        while (msg_in_global.state != LANDED) {
+        	ros::spinOnce();
             Controller::reset();
+            ROS_INFO("State: %d",msg_in_global.state);
         }
+    }
+    //Altitude in millimeters
+    void Controller::elevate(double altitude){ 
+    	twist_msg.linear.z = 0.5;
+    	pub_twist.publish(twist_msg);
+    	while(msg_in_global.altd < altitude){
+    		ros::spinOnce();
+    	}
+    	twist_msg.linear.z = 0;
+    	Controller::auto_hover();
     }
         
     
     double Controller::getPosX(int pixErrorX){
         double alphaX = ((msg_in_global.rotY*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
         double betaX = -atan(tan(GAMMA_X/2)*(pixErrorX)/PIXEL_DIST_X);
-        double height = 1;//;msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
+        double height = msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
         return height * tan(alphaX+betaX);
     }
     double Controller::getPosY(int pixErrorY){
         double alphaY = ((msg_in_global.rotX*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
         double betaY = -atan(tan(GAMMA_Y/2)*(pixErrorY)/PIXEL_DIST_Y);
-        double height = 1;//msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
+        double height = msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
         return height * tan(alphaY+betaY);
     }
 
@@ -102,8 +140,8 @@ namespace controller
     }
 	void Controller::update_state(Point2f center)
 	{
-		measured[X] = getPosX(center.y-PIXEL_DIST_X);
-		measured[Y] = getPosY(center.x-PIXEL_DIST_Y);
+		measured[X] = -getPosX(center.y-PIXEL_DIST_X); //Negative sign to get drone position and not tracket object
+		measured[Y] = -getPosY(center.x-PIXEL_DIST_Y);
 	}
 
 	void Controller::control(double dt)
@@ -111,12 +149,15 @@ namespace controller
 	 	for(int i = 0; i < 4; i++)
 	 	{
       		error[i] = target[i] - measured[i];
-      		integral[i] = integral[i] + error[i] * dt;
+      		if (output[i] < 1 && output[i] > -1)
+      		{
+      			integral[i] = integral[i] + error[i] * dt;
+      		}
       		derivative[i] = (error[i]-previous_error[i])/dt;
       		output[i] = Kp[i]*error[i] + Ki[i] * integral[i] + Kd[i] * derivative[i];
       		previous_error[i] = error[i];
     	}
-    	if (output[X] > 0.1)
+    	/*if (output[X] > 0.1)
     	{
     		output[X] = 0.1;
     	}
@@ -132,6 +173,7 @@ namespace controller
     	{
     		output[Y] = -0.1;
     	}
+    	*/
 
     	//twist_msg.angular.z= output[ROT];
     	twist_msg.linear.x = output[X];
@@ -144,5 +186,8 @@ namespace controller
     	ROS_INFO("Measured pos = (%g,%g)",measured[X],measured[Y]);
   		ROS_INFO("Output x: %g", output[X]);
   		ROS_INFO("Output y: %g", output[Y]);
+  		ROS_INFO("Integral x: %g", Ki[X]*integral[X]);
+  		ROS_INFO("Integral y: %g", Ki[Y]*integral[Y]);
+
 	 }
 }

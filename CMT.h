@@ -35,6 +35,8 @@ public:
     string str_descriptor;
 
     vector<Point2f> points_active; //public for visualization purposes
+    double points_total;
+    double ratio;
     RotatedRect bb_rot;
 
 private:
