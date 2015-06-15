@@ -9,8 +9,8 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-//#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
-#define IMAGE_PATH "/image_raw" //Webcam
+#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
+//#define IMAGE_PATH "/image_raw" //Webcam
 namespace image_converter
 {
   //image_transport::Subscriber image_sub_;

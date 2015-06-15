@@ -356,14 +356,47 @@ int main(int argc, char **argv)
     }*/
 
     //Reset quadcopter
-    //reg.init();
+    reg.init();
     //Takeoff
-    //reg.takeoff();
+    reg.takeoff();
     //reg.elevate(1500);
-    //reg.auto_hover();
+    reg.auto_hover();
 
     //Show preview until key is pressed
-    
+    while (show_preview)
+    {
+        ros::spinOnce();
+        Mat preview;
+        //cap >> preview;
+        preview = ic.src1;
+        screenLog(preview, "Press a key to start selecting an object.");
+        imshow(WIN_NAME, preview);
+        //ROS_INFO("Count: %d",ic.testCount);
+        char k = waitKey(10);
+        if (k != -1) {
+            show_preview = false;
+        }
+    }
+
+    //Get initial image
+    Mat im0;
+    //cap >> im0;
+    im0 = ic.src1.clone();
+    //If no bounding was specified, get it from user
+    if (!bbox_flag)
+    {
+        rect = getRect(im0, WIN_NAME);
+    }
+    reg.setTargetRect(rect);
+    FILE_LOG(logINFO) << "Using " << rect.x << "," << rect.y << "," << rect.width << "," << rect.height
+        << " as initial bounding box.";
+
+    //Convert im0 to grayscale
+    Mat im0_gray;
+    cvtColor(im0, im0_gray, CV_BGR2GRAY);
+
+    //Initialize CMT
+    cmt.initialize(im0_gray, rect);
 
     int frame = 0;
 
