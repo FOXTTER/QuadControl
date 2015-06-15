@@ -101,7 +101,7 @@ void CMT::initialize(const Mat im_gray, const Rect rect)
     FILE_LOG(logDEBUG) << "CMT::initialize() return";
 }
 
-Point2f CMT::processFrame(Mat im_gray) {
+Rect CMT::processFrame(Mat im_gray) {
 
     FILE_LOG(logDEBUG) << "CMT::processFrame() call";
 
@@ -192,7 +192,7 @@ Point2f CMT::processFrame(Mat im_gray) {
     ratio = points_active.size() / points_total;
 
     FILE_LOG(logDEBUG) << "CMT::processFrame() return";
-    return center;
+    return bb_rot.boundingRect();
 }
 
 } /* namespace CMT */

@@ -108,6 +108,42 @@ static void on_mouse( int event, int x, int y, int, void* )
         return;
 }
 
+Rect setTarget(ImageConverter ic, Controller reg, CMT cmt, Mat im0){
+    bool show_preview = true;
+    Rect rect;
+    while (show_preview)
+    {
+        ros::spinOnce();
+        Mat preview;
+        //cap >> preview;
+        preview = ic.src1;
+        screenLog(preview, "Press a key to start selecting an object.");
+        imshow(WIN_NAME, preview);
+        //ROS_INFO("Count: %d",ic.testCount);
+        char k = waitKey(10);
+        if (k != -1) {
+            show_preview = false;
+        }
+    }
+
+    //Get initial image
+    //cap >> im0;
+    im0 = ic.src1.clone();
+    //Get bounding box from user
+    rect = getRect(im0, WIN_NAME);
+    reg.setTargetRect(rect);
+    FILE_LOG(logINFO) << "Using " << rect.x << "," << rect.y << "," << rect.width << "," << rect.height
+        << " as initial bounding box.";
+
+    //Convert im0 to grayscale
+    Mat im0_gray;
+    cvtColor(im0, im0_gray, CV_BGR2GRAY);
+
+    //Initialize CMT
+    cmt.initialize(im0_gray, rect);
+    return rect;
+}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test");
@@ -320,52 +356,19 @@ int main(int argc, char **argv)
     }*/
 
     //Reset quadcopter
-    reg.init();
-    //reg.reset();
+    //reg.init();
     //Takeoff
-    reg.takeoff();
-    reg.elevate(1500);
-    reg.auto_hover();
+    //reg.takeoff();
+    //reg.elevate(1500);
+    //reg.auto_hover();
 
     //Show preview until key is pressed
-    while (show_preview)
-    {
-        ros::spinOnce();
-        Mat preview;
-        //cap >> preview;
-        preview = ic.src1;
-        screenLog(preview, "Press a key to start selecting an object.");
-        imshow(WIN_NAME, preview);
-        //ROS_INFO("Count: %d",ic.testCount);
-        char k = waitKey(10);
-        if (k != -1) {
-            show_preview = false;
-        }
-    }
-
-    //Get initial image
-    Mat im0;
-    //cap >> im0;
-    im0 = ic.src1.clone();
-    //If no bounding was specified, get it from user
-    if (!bbox_flag)
-    {
-        rect = getRect(im0, WIN_NAME);
-    }
-
-    FILE_LOG(logINFO) << "Using " << rect.x << "," << rect.y << "," << rect.width << "," << rect.height
-        << " as initial bounding box.";
-
-    //Convert im0 to grayscale
-    Mat im0_gray;
-    cvtColor(im0, im0_gray, CV_BGR2GRAY);
-
-    //Initialize CMT
-    cmt.initialize(im0_gray, rect);
+    
 
     int frame = 0;
 
     //Main loop
+    setMouseCallback(WIN_NAME, on_mouse,0);
     double time_start=(double)ros::Time::now().toSec();
     while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+50)) {
     	ros::spinOnce();
@@ -381,25 +384,30 @@ int main(int argc, char **argv)
         cvtColor(im, im_gray, CV_BGR2GRAY);
 
         //Let CMT process the frame
-        Point2f center = cmt.processFrame(im_gray);
+        Rect box = cmt.processFrame(im_gray);
+        Point2f center = Point2f(box.x + box.width/2.0, box.y + box.height/2.0);
         circle( im, center, 5, Scalar(0,0,255), -1, 8, 0 );
         line(im, Point(0,180),Point(640,180),Scalar(0,255,0),1,8,0);
         line(im, Point(320,0),Point(320,360),Scalar(0,255,0),1,8,0);
-        reg.update_state(center);
-        if(cmt.ratio > 0.5) {
+        reg.update_state(center, box);
+        if(cmt.ratio > 0.3) {
             reg.control(DT);
         } else {
-            reg.auto_hover();
+            //reg.auto_hover();
         }
 
         char key = display(im, cmt);
 
         if(key == 'q') break;
-
+        else if (key == 'k'){
+            reg.reset();
+            break;
+        }
+        reg.logData();
         //TODO: Provide meaningful output
-        //FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
-        //FILE_LOG(logINFO) << "#" << frame << " total: " << cmt.points_total;
-        //FILE_LOG(logINFO) << "#" << frame << " ratio: " << cmt.ratio;
+        FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
+        FILE_LOG(logINFO) << "#" << frame << " total: " << cmt.points_total;
+        FILE_LOG(logINFO) << "#" << frame << " ratio: " << cmt.ratio;
         r.sleep();
     }
     reg.land();

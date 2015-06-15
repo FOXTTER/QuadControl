@@ -1,5 +1,5 @@
 #include "controller.h"
-
+#include <stdio.h>
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
@@ -9,14 +9,18 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-#define KP_X 0.07
-#define KP_Y 0.07
+#define KP_X 0.01
+#define KP_Y 0.001
 #define KP_ROT 0.0
-#define KP_Z 0
+#define KP_Z 0.001
 #define KI_X 0
 #define KI_Y 0
 #define KI_ROT 0.0
 #define KI_Z 0
+#define KD_X 4.5
+#define KD_Y 4.5
+#define KD_ROT 0.0
+#define KD_Z 0.0
 #define X 0
 #define Y 1
 #define ROT 2
@@ -27,6 +31,8 @@
 #define GAMMA_Y 64
 #define PIXEL_DIST_X 180 //pixels
 #define PIXEL_DIST_Y 320
+
+#define FILTER_WEIGHT 0.2
 using namespace cv;
 
 
@@ -38,6 +44,13 @@ namespace controller
 	{
 		//Take in navdata from ardrone
 		msg_in_global = msg_in;
+	}
+
+	void Controller::logData()
+	{
+	  FILE* pFile = fopen("quadlog.txt", "a");
+	  fprintf(pFile, "%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measured[X],measured[Y],output[X],output[Y]);
+	  fclose(pFile);
 	}
 
 	struct Foo
@@ -78,6 +91,13 @@ namespace controller
 		pub_empty_takeoff = node.advertise<std_msgs::Empty>("/ardrone/takeoff", 1); /* Message queue length is just 1 */
 		pub_empty_land = node.advertise<std_msgs::Empty>("/ardrone/land", 1); /* Message queue length is just 1 */
 		pub_empty_reset = node.advertise<std_msgs::Empty>("/ardrone/reset", 1); /* Message queue length is just 1 */
+		pseudo_hover_msg.linear.x = 0;
+		pseudo_hover_msg.linear.y = 0;
+		pseudo_hover_msg.linear.z = 0;
+		pseudo_hover_msg.angular.x = 1;
+		pseudo_hover_msg.angular.y = 1;
+		pseudo_hover_msg.angular.z = 0;
+		
 		//client = node.serviceClient<std_msgs::Empty>("/ardrone/flattrim");
 	}
 
@@ -102,13 +122,14 @@ namespace controller
     void Controller::reset(){
         pub_empty_reset.publish(emp_msg);
     }
-    
+
     void Controller::init(){
         while (msg_in_global.state != LANDED) {
         	ros::spinOnce();
             Controller::reset();
             ROS_INFO("State: %d",msg_in_global.state);
         }
+        start_time = (double)ros::Time::now().toSec();
     }
     //Altitude in millimeters
     void Controller::elevate(double altitude){ 
@@ -121,27 +142,43 @@ namespace controller
     	Controller::auto_hover();
     }
         
-    
+    void Controller::setTargetRect(Rect rect){
+    	target[X] = rect.width;
+    }
+
     double Controller::getPosX(int pixErrorX){
         double alphaX = ((msg_in_global.rotY*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
         double betaX = -atan(tan(GAMMA_X/2)*(pixErrorX)/PIXEL_DIST_X);
-        double height = msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
-        return height * tan(alphaX+betaX);
+        double height = ((double)msg_in_global.altd)/1000; //HØJDEMÅLING FRA ULTRALYD
+        //Negative sign to get drone position and not tracket object
+        return -(height * tan(alphaX+betaX));
     }
     double Controller::getPosY(int pixErrorY){
         double alphaY = ((msg_in_global.rotX*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
         double betaY = -atan(tan(GAMMA_Y/2)*(pixErrorY)/PIXEL_DIST_Y);
-        double height = msg_in_global.altd/1000; //HØJDEMÅLING FRA ULTRALYD
-        return height * tan(alphaY+betaY);
+        double height = ((double)msg_in_global.altd)/1000; //HØJDEMÅLING FRA ULTRALYD
+        //Negative sign to get drone position and not tracket object
+        return -(height * tan(alphaY+betaY));
     }
 
     void Controller::auto_hover(){
     	pub_twist.publish(twist_msg_hover);
     }
-	void Controller::update_state(Point2f center)
+    void Controller::pseudo_hover(){
+    	pub_twist.publish(pseudo_hover_msg);
+    }
+    //Filtered data
+	void Controller::update_state(Point2f center, Rect rect)
 	{
-		measured[X] = -getPosX(center.y-PIXEL_DIST_X); //Negative sign to get drone position and not tracket object
-		measured[Y] = -getPosY(center.x-PIXEL_DIST_Y);
+		//measured[X] = measured[X]+ FILTER_WEIGHT*(getPosX(center.y-PIXEL_DIST_X)-measured[X]); 
+		//measured[Y] = measured[Y]+ FILTER_WEIGHT*(getPosY(center.x-PIXEL_DIST_Y)-measured[Y]);
+		//measured[X] = getPosX(center.y-PIXEL_DIST_X);
+		//measured[Y] = getPosY(center.x-PIXEL_DIST_Y);
+		//Kun til front kamera
+		measured[X] = rect.width;
+		measured[Y] = center.x - PIXEL_DIST_Y;
+		measured[Z] = center.y - PIXEL_DIST_X;
+		ROS_INFO("DEBUG: %g",measured[Y]);
 	}
 
 	void Controller::control(double dt)
@@ -178,16 +215,17 @@ namespace controller
     	//twist_msg.angular.z= output[ROT];
     	twist_msg.linear.x = output[X];
     	twist_msg.linear.y = output[Y];
-    	//twist_msg.linear.z = output[Z];
+    	twist_msg.linear.z = output[Z];
 
 
     	pub_twist.publish(twist_msg);
 
     	ROS_INFO("Measured pos = (%g,%g)",measured[X],measured[Y]);
-  		ROS_INFO("Output x: %g", output[X]);
+    	ROS_INFO("Output x: %g", output[X]);
   		ROS_INFO("Output y: %g", output[Y]);
-  		ROS_INFO("Integral x: %g", Ki[X]*integral[X]);
-  		ROS_INFO("Integral y: %g", Ki[Y]*integral[Y]);
+  		ROS_INFO("Output z: %g", output[Z]);
+  		//ROS_INFO("Integral x: %g", Ki[X]*integral[X]);
+  		//ROS_INFO("Integral y: %g", Ki[Y]*integral[Y]);
 
 	 }
 }

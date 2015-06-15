@@ -24,7 +24,7 @@ class CMT
 public:
     CMT() : str_detector("FAST"), str_descriptor("BRISK") {};
     void initialize(const Mat im_gray, const Rect rect);
-    Point2f processFrame(const Mat im_gray);
+    Rect processFrame(const Mat im_gray);
 
     Fusion fusion;
     Matcher matcher;

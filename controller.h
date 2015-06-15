@@ -26,10 +26,13 @@ namespace controller{
 			void land();
 			void control(double dt);
 			void wait(double tid);
-			void update_state(Point2f center);
+			void update_state(Point2f center, Rect rect);
 			void auto_hover();
 			void calibrate();
+			void logData();
+			void pseudo_hover();
 			void elevate(double time);
+			void setTargetRect(Rect rect);
 
 
 		//private:
@@ -42,7 +45,7 @@ namespace controller{
 			ros::ServiceClient client;
 			geometry_msgs::Twist twist_msg;
 			geometry_msgs::Twist twist_msg_hover;
-			geometry_msgs::Twist twist_msg_pshover;
+			geometry_msgs::Twist pseudo_hover_msg;
 			std_msgs::Empty emp_msg;
 			ardrone_autonomy::Navdata msg_in_global;
 			vector<double> previous_error;
@@ -59,6 +62,7 @@ namespace controller{
         	struct Foo;
             double getPosX(int pixErrorX);
             double getPosY(int pixErrorY);
+            double start_time;
 	};
 }
 
