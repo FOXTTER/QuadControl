@@ -11,6 +11,7 @@
 #include <highgui.h>
 #define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
 //#define IMAGE_PATH "/image_raw" //Webcam
+
 namespace image_converter
 {
   //image_transport::Subscriber image_sub_;
@@ -37,7 +38,7 @@ namespace image_converter
   {
     //cv::destroyWindow(OPENCV_WINDOW);w
   }
-
+  double data[] = { 8.0617692817080149e+02, 0., 3.1935989457565023e+02, 0.,8.0304475206552934e+02, 1.8492321512613066e+02, 0., 0., 1. };
   void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg)
   {
     testCount++;
@@ -58,6 +59,14 @@ namespace image_converter
     
     
     src1 = cv_ptr->image;
+    Mat temp = src1.clone();
+    Mat cameraMatrix;
+    Mat distCoeffs;
+    FileStorage fs("calib.xml",FileStorage::READ);
+    fs["cameraMatrix"] >> cameraMatrix;
+    fs["distCoeffs"] >> distCoeffs;
+    fs.release();
+    undistort(temp, src1, cameraMatrix, distCoeffs);
 
     // Update GUI Window
     //cv::imshow(OPENCV_WINDOW, cv_ptr->image);

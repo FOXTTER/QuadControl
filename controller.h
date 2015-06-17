@@ -33,6 +33,7 @@ namespace controller{
 			void pseudo_hover();
 			void elevate(double time);
 			void setTargetRect(Rect rect);
+			void setTargetRot();
 
 
 		//private:

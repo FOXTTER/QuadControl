@@ -53,12 +53,27 @@ using namespace std;
 using namespace image_converter;
 using namespace controller;
 #define DT 0.05
-
+#define X 0
+#define Y 1
+#define ROT 2
+#define Z 3
 static string WIN_NAME = "CMT";
 
 /// Matrices to store images
 
 Mat dst;
+const int slider_max = 1000;
+int kpx_slider = 0;
+int kdx_slider = 0;
+int kpy_slider = 0;
+int kdy_slider = 0;
+int kpz_slider = 0;
+int kdz_slider = 0;
+int kpr_slider = 0;
+int kdr_slider = 0;
+bool controller_updated = false;
+
+
 
 vector<float> getNextLineAndSplitIntoFloats(istream& str)
 {
@@ -142,6 +157,39 @@ Rect setTarget(ImageConverter ic, Controller reg, CMT cmt, Mat im0){
     //Initialize CMT
     cmt.initialize(im0_gray, rect);
     return rect;
+}
+
+void on_trackbar1( int, void* )
+{
+    controller_updated = true;
+}
+void on_trackbar2( int, void* )
+{
+    controller_updated = true;
+}
+void on_trackbar3( int, void* )
+{
+    controller_updated = true;
+}
+void on_trackbar4( int, void* )
+{
+    controller_updated = true;
+}
+void on_trackbar5( int, void* )
+{
+    controller_updated = true;
+}
+void on_trackbar6( int, void* )
+{
+    controller_updated = true;
+}
+void on_trackbar7( int, void* )
+{
+    controller_updated = true;
+}
+void on_trackbar8( int, void* )
+{
+    controller_updated = true;
 }
 
 int main(int argc, char **argv)
@@ -359,8 +407,9 @@ int main(int argc, char **argv)
     reg.init();
     //Takeoff
     reg.takeoff();
-    //reg.elevate(1500);
+    reg.elevate(1000);
     reg.auto_hover();
+    reg.setTargetRot();
 
     //Show preview until key is pressed
     while (show_preview)
@@ -401,14 +450,35 @@ int main(int argc, char **argv)
     int frame = 0;
 
     //Main loop
+    createTrackbar( "Kp x: ", WIN_NAME, &kpx_slider, slider_max, on_trackbar1 );
+    createTrackbar( "Kd x: ", WIN_NAME, &kdx_slider, slider_max, on_trackbar2 );
+    createTrackbar( "Kp y: ", WIN_NAME, &kpy_slider, slider_max, on_trackbar3 );
+    createTrackbar( "Kd y: ", WIN_NAME, &kdy_slider, slider_max, on_trackbar4 );
+    createTrackbar( "Kp z: ", WIN_NAME, &kpz_slider, slider_max, on_trackbar5 );
+    createTrackbar( "Kd z: ", WIN_NAME, &kdz_slider, slider_max, on_trackbar6 );
+    createTrackbar( "Kp r: ", WIN_NAME, &kpr_slider, slider_max, on_trackbar7 );
+    createTrackbar( "Kd r: ", WIN_NAME, &kdr_slider, slider_max, on_trackbar8 );
     setMouseCallback(WIN_NAME, on_mouse,0);
+    VideoWriter vid;
+    vid.open("test.mpg",CV_FOURCC('P','I','M','1'),1/DT,Size(640,360));
     double time_start=(double)ros::Time::now().toSec();
-    while (ros::ok() && ((double)ros::Time::now().toSec()< time_start+50)) {
+    while (ros::ok() || ((double)ros::Time::now().toSec()< time_start+50)) {
     	ros::spinOnce();
         frame++;
 
         Mat im;
+        if (controller_updated)
+        {
+            reg.Kp[X] = -(double)(kpx_slider)/(10*slider_max);
+            reg.Kd[X] = -(double)(kdx_slider)/(10*slider_max);
+            reg.Kp[Y] = (double)(kpy_slider)/(1000*slider_max);
+            reg.Kd[Y] = (double)(kdy_slider)/(1000*slider_max);
+            reg.Kp[Z] = (double)(kpz_slider)/(100*slider_max);
+            reg.Kd[Z] = (double)(kdz_slider)/(100*slider_max);
+            reg.Kp[ROT] = (double)(kpr_slider)/(slider_max);
+            reg.Kd[ROT] = (double)(kdr_slider)/(slider_max);
 
+        }
         //If loop flag is set, reuse initial image (for debugging purposes)
         if (loop_flag) im0.copyTo(im);
         else im = ic.src1;//cap >> im; //Else use next image in stream
@@ -426,11 +496,11 @@ int main(int argc, char **argv)
         if(cmt.ratio > 0.3) {
             reg.control(DT);
         } else {
-            //reg.auto_hover();
+            reg.auto_hover();
         }
 
         char key = display(im, cmt);
-
+        vid.write(im);
         if(key == 'q') break;
         else if (key == 'k'){
             reg.reset();

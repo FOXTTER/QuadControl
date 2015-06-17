@@ -9,18 +9,18 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-#define KP_X 0.01
-#define KP_Y 0.001
-#define KP_ROT 0.0
+#define KP_X -0.16
+#define KP_Y 0.00016
+#define KP_ROT 0.5
 #define KP_Z 0.001
-#define KI_X 0
-#define KI_Y 0
+#define KI_X 0.000
+#define KI_Y 0.0000
 #define KI_ROT 0.0
-#define KI_Z 0
-#define KD_X 4.5
-#define KD_Y 4.5
-#define KD_ROT 0.0
-#define KD_Z 0.0
+#define KI_Z 0.0000
+#define KD_X -2
+#define KD_Y 0.000075
+#define KD_ROT 3
+#define KD_Z 1
 #define X 0
 #define Y 1
 #define ROT 2
@@ -31,8 +31,10 @@
 #define GAMMA_Y 64
 #define PIXEL_DIST_X 180 //pixels
 #define PIXEL_DIST_Y 320
+#define FOCAL_LENGTH_X 607.7
+#define FOCAL_LENGTH_Y 554
 
-#define FILTER_WEIGHT 0.2
+#define FILTER_WEIGHT 0.5
 using namespace cv;
 
 
@@ -40,16 +42,16 @@ using namespace cv;
 
 namespace controller
 {
+
 	void Controller::nav_callback(const ardrone_autonomy::Navdata& msg_in)
 	{
 		//Take in navdata from ardrone
 		msg_in_global = msg_in;
 	}
-
 	void Controller::logData()
 	{
 	  FILE* pFile = fopen("quadlog.txt", "a");
-	  fprintf(pFile, "%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measured[X],measured[Y],output[X],output[Y]);
+	  fprintf(pFile, "%g,%g,%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measured[X],measured[Y],measured[Z],output[X],output[Y],output[Z]);
 	  fclose(pFile);
 	}
 
@@ -78,14 +80,14 @@ namespace controller
 	,Kd(4,0.0)
 	,measured(4,0.0)
 	{
-		Kp[X] = KP_X;
-		Kp[Y] = KP_Y;
-		Kp[ROT] = KP_ROT;
-		Kp[Z] = KP_Z;
-		Ki[X] = KI_X;
-		Ki[Y] = KI_Y;
-		Ki[ROT] = KI_ROT;
-		Ki[Z] = KI_Z;
+		//Kp[X] = KP_X;
+		//Kp[Y] = KP_Y;
+		//Kp[ROT] = KP_ROT;
+		//Kp[Z] = KP_Z;
+		//Ki[X] = KI_X;
+		//Ki[Y] = KI_Y;
+		//Ki[ROT] = KI_ROT;
+		//Ki[Z] = KI_Z;
 		nav_sub = node.subscribe("/ardrone/navdata", 1, &Controller::nav_callback,this);
 		pub_twist = node.advertise<geometry_msgs::Twist>("/cmd_vel", 1); /* Message queue length is just 1 */
 		pub_empty_takeoff = node.advertise<std_msgs::Empty>("/ardrone/takeoff", 1); /* Message queue length is just 1 */
@@ -141,9 +143,12 @@ namespace controller
     	twist_msg.linear.z = 0;
     	Controller::auto_hover();
     }
-        
+
+    void Controller::setTargetRot(){
+    	target[ROT] = 0;
+    }
     void Controller::setTargetRect(Rect rect){
-    	target[X] = rect.width;
+    	target[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
     }
 
     double Controller::getPosX(int pixErrorX){
@@ -175,14 +180,19 @@ namespace controller
 		//measured[X] = getPosX(center.y-PIXEL_DIST_X);
 		//measured[Y] = getPosY(center.x-PIXEL_DIST_Y);
 		//Kun til front kamera
-		measured[X] = rect.width;
-		measured[Y] = center.x - PIXEL_DIST_Y;
-		measured[Z] = center.y - PIXEL_DIST_X;
-		ROS_INFO("DEBUG: %g",measured[Y]);
+		measured[ROT] = atan(((center.x-PIXEL_DIST_Y)*tan(1.6/2))/(PIXEL_DIST_Y/2));
+		measured[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
+		measured[Y] = measured[Y]+ FILTER_WEIGHT*((center.x-PIXEL_DIST_Y)-measured[Y]);
+		measured[Z] = measured[Z]+ FILTER_WEIGHT*(((center.y-PIXEL_DIST_X)+sin(msg_in_global.rotY*3.14/180)*FOCAL_LENGTH_X)-measured[Z]); 
+		//ROS_INFO("DEBUG: %g",measured[Y]);
+		//Den fancy måde
+		//measured[Y] = center.x/PIXEL_DIST_Y;
+		//measured[Z] = center.y/PIXEL_DIST_X;
+		//measured[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
 	}
 
 	void Controller::control(double dt)
-	 {
+	 {	//Original controller
 	 	for(int i = 0; i < 4; i++)
 	 	{
       		error[i] = target[i] - measured[i];
@@ -194,6 +204,22 @@ namespace controller
       		output[i] = Kp[i]*error[i] + Ki[i] * integral[i] + Kd[i] * derivative[i];
       		previous_error[i] = error[i];
     	}
+
+      	//Eksperimentiel
+      	/*
+      	error[X] = (measured[X] - target[X])*sqrt(0.006)*sqrt((alfa_u*alfa_v)/(PIXEL_DIST_X*PIXEL_DIST_Y));
+      	error[Y] = (measured[Y] - target[Y])*2*PIXEL_DIST_X/alfa_u;
+      	error[ROT] = (measured)
+      	for(int i = 0; i < 4; i++)
+	 	{
+      		if (output[i] < 1 && output[i] > -1)
+      		{
+      			integral[i] = integral[i] + error[i] * dt;
+      		}
+      		derivative[i] = (error[i]-previous_error[i])/dt;
+      		output[i] = Kp[i]*error[i] + Ki[i] * integral[i] + Kd[i] * derivative[i];
+      		previous_error[i] = error[i];
+    	}*/
     	/*if (output[X] > 0.1)
     	{
     		output[X] = 0.1;
@@ -212,7 +238,7 @@ namespace controller
     	}
     	*/
 
-    	//twist_msg.angular.z= output[ROT];
+    	twist_msg.angular.z= output[ROT];
     	twist_msg.linear.x = output[X];
     	twist_msg.linear.y = output[Y];
     	twist_msg.linear.z = output[Z];
@@ -224,6 +250,7 @@ namespace controller
     	ROS_INFO("Output x: %g", output[X]);
   		ROS_INFO("Output y: %g", output[Y]);
   		ROS_INFO("Output z: %g", output[Z]);
+  		ROS_INFO("Output r: %g", output[ROT]);
   		//ROS_INFO("Integral x: %g", Ki[X]*integral[X]);
   		//ROS_INFO("Integral y: %g", Ki[Y]*integral[Y]);
 
