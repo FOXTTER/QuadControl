@@ -9,8 +9,11 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-//#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
-#define IMAGE_PATH "/image_raw" //Webcam
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/photo/photo.hpp"
+#include "opencv2/nonfree/features2d.hpp"
+#define IMAGE_PATH "/ardrone/image_raw" //Quadcopter
+//#define IMAGE_PATH "/image_raw" //Webcam
 
 namespace image_converter
 {
@@ -67,7 +70,12 @@ namespace image_converter
     fs["distCoeffs"] >> distCoeffs;
     fs.release();
     undistort(temp, src1, cameraMatrix, distCoeffs);
-
+    //Remove light
+    //inRange(src1, Scalar( 0 , 0, 0), Scalar(180, 255, 250), temp );
+    //cvtColor(temp,temp,COLOR_GRAY2BGR);
+    //bitwise_and(src1,temp,src1);
+    //bitwise_not ( temp, temp);
+    //inpaint(src1, temp, src1, 10, INPAINT_NS);
     // Update GUI Window
     //cv::imshow(OPENCV_WINDOW, cv_ptr->image);
     cv::waitKey(3);

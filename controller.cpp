@@ -51,7 +51,8 @@ namespace controller
 	void Controller::logData()
 	{
 	  FILE* pFile = fopen("quadlog.txt", "a");
-	  fprintf(pFile, "%g,%g,%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measured[X],measured[Y],measured[Z],output[X],output[Y],output[Z]);
+	  fprintf(pFile, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measured[X],measured[Y],measured[Z],measured[ROT],
+      output[X],output[Y],output[Z],output[ROT],error[X],error[Y],error[Z],error[ROT]);
 	  fclose(pFile);
 	}
 

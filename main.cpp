@@ -142,7 +142,7 @@ void saveTarget(Mat im, Rect rect){
     fs.release();
 }
 
-Rect setTarget(ImageConverter* ic, Controller* reg, CMT* cmt, Mat* im0, VideoWriter* vid){
+Rect setTarget(ImageConverter* ic, Controller* reg, CMT* cmt, Mat* im0, VideoWriter* vid, ros::Rate r){
     (*cmt) = CMT();
     bool show_preview = true;
     Rect rect;
@@ -160,6 +160,7 @@ Rect setTarget(ImageConverter* ic, Controller* reg, CMT* cmt, Mat* im0, VideoWri
         if (k != -1) {
             show_preview = false;
         }
+        r.sleep();
     }
 
     //Get initial image
@@ -225,6 +226,32 @@ void on_trackbar7( int, void* )
 void on_trackbar8( int, void* )
 {
     controller_updated = true;
+}
+void drawText(Mat img, string text,int c){
+    int fontFace = FONT_HERSHEY_SIMPLEX;
+    double fontScale = 1;
+    int thickness = 3;
+    
+    
+    
+    int baseline=0;
+    Size textSize = getTextSize(text, fontFace,
+                                fontScale, thickness, &baseline);
+    baseline += thickness;
+    
+    // center the text
+    Point textOrg(0,320);
+    
+    // then put the text itself
+    if (c == 0)
+    {
+        putText(img, text, textOrg, fontFace, fontScale,
+            Scalar(0,255,0), thickness, 8);
+    }
+    else{
+        putText(img, text, textOrg, fontFace, fontScale,
+            Scalar(0,0,255), thickness, 8);
+    }
 }
 bool last_flag = false;
 int main(int argc, char **argv)
@@ -445,17 +472,17 @@ int main(int argc, char **argv)
     }*/
 
     //Reset quadcopter
-    //reg.init();
+    reg.init();
     //Takeoff
-    //reg.takeoff();
-    //reg.elevate(1000);
-    //reg.auto_hover();
+    reg.takeoff();
+    reg.elevate(1000);
+    reg.auto_hover();
     //reg.setTargetRot();
 
     //Show preview until key is pressed
     Mat im0;
     VideoWriter vid;
-    vid.open("test.mpg",CV_FOURCC('P','I','M','1'),1/DT,Size(640,360));
+    vid.open("test.avi",CV_FOURCC('D', 'I', 'V', '3'),1/DT,Size(640,360));
     if (last_flag)
     {
         Mat im0_gray;
@@ -467,7 +494,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        setTarget(&ic, &reg, &cmt, &im0, &vid);
+        setTarget(&ic, &reg, &cmt, &im0, &vid, r);
     }
     int frame = 0;
     loadPID(&reg);
@@ -516,8 +543,10 @@ int main(int argc, char **argv)
         line(im, Point(320,0),Point(320,360),Scalar(0,255,0),1,8,0);
         reg.update_state(center, box);
         if(cmt.ratio > 0.3) {
+            drawText(im,"Target lockon",0);
             reg.control(DT);
         } else {
+            drawText(im,"Target lost",1);
             reg.auto_hover();
         }
 
@@ -526,7 +555,7 @@ int main(int argc, char **argv)
         if(key == 'q') break;
         else if (key == 'k'){
             reg.auto_hover();
-            setTarget(&ic, &reg, &cmt, &im0, &vid);
+            setTarget(&ic, &reg, &cmt, &im0, &vid, r);
             continue;
         }
         reg.logData();
