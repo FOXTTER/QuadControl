@@ -67,7 +67,8 @@ namespace controller
 	
 	  Request request;
 	  Response response;
-	}; 
+	};
+
 	Controller::Controller()
 	:previous_error(4,0.0)
 	,error(4,0.0)
@@ -117,62 +118,89 @@ namespace controller
  			ros::spinOnce();
  		}
 	}
-    void Controller::land(){
-        pub_empty_land.publish(emp_msg);
-    }
-    
-    void Controller::reset(){
-        pub_empty_reset.publish(emp_msg);
-    }
 
-    void Controller::init(){
-        while (msg_in_global.state != LANDED) {
-        	ros::spinOnce();
-            Controller::reset();
-            ROS_INFO("State: %d",msg_in_global.state);
-        }
-        start_time = (double)ros::Time::now().toSec();
-    }
-    //Altitude in millimeters
-    void Controller::elevate(double altitude){ 
-    	twist_msg.linear.z = 0.5;
-    	pub_twist.publish(twist_msg);
-    	while(msg_in_global.altd < altitude){
-    		ros::spinOnce();
-    	}
-    	twist_msg.linear.z = 0;
-    	Controller::auto_hover();
-    }
+  void Controller::saveController(){
+    FileStorage fs("PIDvals.yml", FileStorage::WRITE);
+    fs << "Kpx" << Kp[X];
+    fs << "Kdx" << Kd[X];
+    fs << "Kpy" << Kp[Y];
+    fs << "Kdy" << Kd[Y];
+    fs << "Kpz" << Kp[Z];
+    fs << "Kdz" << Kd[Z];
+    fs << "Kpr" << Kp[ROT];
+    fs << "Kdr" << Kd[ROT];
+    fs.release();
+  }
 
-    void Controller::setTargetRot(){
-    	target[ROT] = 0;
-    }
-    void Controller::setTargetRect(Rect rect){
-    	target[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
-    }
+  void Controller::loadController(){
+    FileStorage fs("PIDvals.yml", FileStorage::READ);
+    fs["Kpx"] >> Kp[X];
+    fs["Kdx"] >> Kd[X];
+    fs["Kpy"] >> Kp[Y];
+    fs["Kdy"] >> Kd[Y];
+    fs["Kpz"] >> Kp[Z];
+    fs["Kdz"] >> Kd[Z];
+    fs["Kpr"] >> Kp[ROT];
+    fs["Kdr"] >> Kd[ROT];
+    fs.release();
+  }
 
-    double Controller::getPosX(int pixErrorX){
-        double alphaX = ((msg_in_global.rotY*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
-        double betaX = -atan(tan(GAMMA_X/2)*(pixErrorX)/PIXEL_DIST_X);
-        double height = ((double)msg_in_global.altd)/1000; //HØJDEMÅLING FRA ULTRALYD
-        //Negative sign to get drone position and not tracket object
-        return -(height * tan(alphaX+betaX));
-    }
-    double Controller::getPosY(int pixErrorY){
-        double alphaY = ((msg_in_global.rotX*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
-        double betaY = -atan(tan(GAMMA_Y/2)*(pixErrorY)/PIXEL_DIST_Y);
-        double height = ((double)msg_in_global.altd)/1000; //HØJDEMÅLING FRA ULTRALYD
-        //Negative sign to get drone position and not tracket object
-        return -(height * tan(alphaY+betaY));
-    }
+  void Controller::land(){
+      pub_empty_land.publish(emp_msg);
+  }
+  
+  void Controller::reset(){
+      pub_empty_reset.publish(emp_msg);
+  }
 
-    void Controller::auto_hover(){
-    	pub_twist.publish(twist_msg_hover);
-    }
-    void Controller::pseudo_hover(){
-    	pub_twist.publish(pseudo_hover_msg);
-    }
-    //Filtered data
+  void Controller::init(){
+      while (msg_in_global.state != LANDED) {
+      	ros::spinOnce();
+          Controller::reset();
+          ROS_INFO("State: %d",msg_in_global.state);
+      }
+      start_time = (double)ros::Time::now().toSec();
+  }
+  //Altitude in millimeters
+  void Controller::elevate(double altitude){ 
+  	twist_msg.linear.z = 0.5;
+  	pub_twist.publish(twist_msg);
+  	while(msg_in_global.altd < altitude){
+  		ros::spinOnce();
+  	}
+  	twist_msg.linear.z = 0;
+  	Controller::auto_hover();
+  }
+
+  void Controller::setTargetRot(){
+  	target[ROT] = 0;
+  }
+  void Controller::setTargetRect(Rect rect){
+  	target[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
+  }
+
+  double Controller::getPosX(int pixErrorX){
+      double alphaX = ((msg_in_global.rotY*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
+      double betaX = -atan(tan(GAMMA_X/2)*(pixErrorX)/PIXEL_DIST_X);
+      double height = ((double)msg_in_global.altd)/1000; //HØJDEMÅLING FRA ULTRALYD
+      //Negative sign to get drone position and not tracket object
+      return -(height * tan(alphaX+betaX));
+  }
+  double Controller::getPosY(int pixErrorY){
+      double alphaY = ((msg_in_global.rotX*3.14)/180); // SKAL HENTES FRA QUADCOPTEREN
+      double betaY = -atan(tan(GAMMA_Y/2)*(pixErrorY)/PIXEL_DIST_Y);
+      double height = ((double)msg_in_global.altd)/1000; //HØJDEMÅLING FRA ULTRALYD
+      //Negative sign to get drone position and not tracket object
+      return -(height * tan(alphaY+betaY));
+  }
+
+  void Controller::auto_hover(){
+  	pub_twist.publish(twist_msg_hover);
+  }
+  void Controller::pseudo_hover(){
+  	pub_twist.publish(pseudo_hover_msg);
+  }
+  //Filtered data
 	void Controller::update_state(Point2f center, Rect rect)
 	{
 		//measured[X] = measured[X]+ FILTER_WEIGHT*(getPosX(center.y-PIXEL_DIST_X)-measured[X]); 

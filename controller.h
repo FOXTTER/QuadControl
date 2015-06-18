@@ -34,6 +34,8 @@ namespace controller{
 			void elevate(double time);
 			void setTargetRect(Rect rect);
 			void setTargetRot();
+			void saveController();
+			void loadController();
 
 
 		//private:

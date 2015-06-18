@@ -57,6 +57,11 @@ using namespace controller;
 #define Y 1
 #define ROT 2
 #define Z 3
+#define X_SLIDER_WEIGHT -10
+#define Y_SLIDER_WEIGHT 1000
+#define Z_SLIDER_WEIGHT 100
+#define ROT_SLIDER_WEIGHT 1
+
 static string WIN_NAME = "CMT";
 
 /// Matrices to store images
@@ -123,7 +128,22 @@ static void on_mouse( int event, int x, int y, int, void* )
         return;
 }
 
-Rect setTarget(ImageConverter ic, Controller reg, CMT cmt, Mat im0){
+void loadTarget(Mat* im, Rect* rect){
+    FileStorage fs("target.yml", FileStorage::READ);
+    fs["im"] >> (*im);
+    fs["rect"] >> (*rect);
+    fs.release();
+}
+
+void saveTarget(Mat im, Rect rect){
+    FileStorage fs("target.yml", FileStorage::WRITE);
+    fs << "im" << im;
+    fs << "rect" << rect;
+    fs.release();
+}
+
+Rect setTarget(ImageConverter* ic, Controller* reg, CMT* cmt, Mat* im0, VideoWriter* vid){
+    (*cmt) = CMT();
     bool show_preview = true;
     Rect rect;
     while (show_preview)
@@ -131,10 +151,11 @@ Rect setTarget(ImageConverter ic, Controller reg, CMT cmt, Mat im0){
         ros::spinOnce();
         Mat preview;
         //cap >> preview;
-        preview = ic.src1;
+        preview = ic->src1;
         screenLog(preview, "Press a key to start selecting an object.");
         imshow(WIN_NAME, preview);
         //ROS_INFO("Count: %d",ic.testCount);
+        vid->write(preview);
         char k = waitKey(10);
         if (k != -1) {
             show_preview = false;
@@ -143,20 +164,34 @@ Rect setTarget(ImageConverter ic, Controller reg, CMT cmt, Mat im0){
 
     //Get initial image
     //cap >> im0;
-    im0 = ic.src1.clone();
+    (*im0) = ic->src1.clone();
     //Get bounding box from user
-    rect = getRect(im0, WIN_NAME);
-    reg.setTargetRect(rect);
+    rect = getRect((*im0), WIN_NAME);
+    reg->setTargetRect(rect);
     FILE_LOG(logINFO) << "Using " << rect.x << "," << rect.y << "," << rect.width << "," << rect.height
         << " as initial bounding box.";
 
     //Convert im0 to grayscale
     Mat im0_gray;
-    cvtColor(im0, im0_gray, CV_BGR2GRAY);
+    cvtColor((*im0), im0_gray, CV_BGR2GRAY);
 
     //Initialize CMT
-    cmt.initialize(im0_gray, rect);
+    cmt->initialize(im0_gray, rect);
+    setMouseCallback(WIN_NAME, on_mouse,0);
+    saveTarget(im0_gray,rect);
     return rect;
+}
+
+void loadPID(Controller * reg){
+    reg->loadController();
+    kpx_slider = reg->Kp[X]*X_SLIDER_WEIGHT*slider_max;
+    kdx_slider = reg->Kd[X]*X_SLIDER_WEIGHT*slider_max;
+    kpy_slider = reg->Kp[Y]*Y_SLIDER_WEIGHT*slider_max;
+    kdy_slider = reg->Kd[Y]*Y_SLIDER_WEIGHT*slider_max;
+    kpz_slider = reg->Kp[Z]*Z_SLIDER_WEIGHT*slider_max;
+    kdz_slider = reg->Kd[Z]*Z_SLIDER_WEIGHT*slider_max;
+    kpr_slider = reg->Kp[ROT]*ROT_SLIDER_WEIGHT*slider_max;
+    kdr_slider = reg->Kd[ROT]*ROT_SLIDER_WEIGHT*slider_max;
 }
 
 void on_trackbar1( int, void* )
@@ -191,7 +226,7 @@ void on_trackbar8( int, void* )
 {
     controller_updated = true;
 }
-
+bool last_flag = false;
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test");
@@ -199,6 +234,7 @@ int main(int argc, char **argv)
     Controller reg;
     ros::Rate r(1/DT); // 10 hz
     ros::spinOnce();
+    system("rosservice call /ardrone/flattrim");
     //Create a CMT object
     reg.wait(1.0);
 
@@ -219,6 +255,7 @@ int main(int argc, char **argv)
     const int bbox_cmd = 1002;
     const int no_scale_cmd = 1003;
     const int with_rotation_cmd = 1004;
+    const int remember_last = 1005;
 
     struct option longopts[] =
     {
@@ -232,6 +269,7 @@ int main(int argc, char **argv)
         {"descriptor", required_argument, 0, descriptor_cmd},
         {"no-scale", no_argument, 0, no_scale_cmd},
         {"with-rotation", no_argument, 0, with_rotation_cmd},
+        {"remember-last", no_argument, 0, remember_last},
         {0, 0, 0, 0}
     };
 
@@ -271,6 +309,9 @@ int main(int argc, char **argv)
                 break;
             case with_rotation_cmd:
                 cmt.consensus.estimate_rotation = true;
+                break;
+            case remember_last:
+                last_flag = true;
                 break;
             case '?':
                 return 1;
@@ -404,50 +445,34 @@ int main(int argc, char **argv)
     }*/
 
     //Reset quadcopter
-    reg.init();
+    //reg.init();
     //Takeoff
-    reg.takeoff();
-    reg.elevate(1000);
-    reg.auto_hover();
-    reg.setTargetRot();
+    //reg.takeoff();
+    //reg.elevate(1000);
+    //reg.auto_hover();
+    //reg.setTargetRot();
 
     //Show preview until key is pressed
-    while (show_preview)
-    {
-        ros::spinOnce();
-        Mat preview;
-        //cap >> preview;
-        preview = ic.src1;
-        screenLog(preview, "Press a key to start selecting an object.");
-        imshow(WIN_NAME, preview);
-        //ROS_INFO("Count: %d",ic.testCount);
-        char k = waitKey(10);
-        if (k != -1) {
-            show_preview = false;
-        }
-    }
-
-    //Get initial image
     Mat im0;
-    //cap >> im0;
-    im0 = ic.src1.clone();
-    //If no bounding was specified, get it from user
-    if (!bbox_flag)
+    VideoWriter vid;
+    vid.open("test.mpg",CV_FOURCC('P','I','M','1'),1/DT,Size(640,360));
+    if (last_flag)
     {
-        rect = getRect(im0, WIN_NAME);
+        Mat im0_gray;
+        Rect rect;
+        loadTarget(&im0_gray,&rect);
+        reg.setTargetRect(rect);
+        cmt.initialize(im0_gray, rect);
+        setMouseCallback(WIN_NAME, on_mouse,0);
     }
-    reg.setTargetRect(rect);
-    FILE_LOG(logINFO) << "Using " << rect.x << "," << rect.y << "," << rect.width << "," << rect.height
-        << " as initial bounding box.";
-
-    //Convert im0 to grayscale
-    Mat im0_gray;
-    cvtColor(im0, im0_gray, CV_BGR2GRAY);
-
-    //Initialize CMT
-    cmt.initialize(im0_gray, rect);
-
+    else
+    {
+        setTarget(&ic, &reg, &cmt, &im0, &vid);
+    }
     int frame = 0;
+    loadPID(&reg);
+    //Read PID values
+
 
     //Main loop
     createTrackbar( "Kp x: ", WIN_NAME, &kpx_slider, slider_max, on_trackbar1 );
@@ -458,9 +483,6 @@ int main(int argc, char **argv)
     createTrackbar( "Kd z: ", WIN_NAME, &kdz_slider, slider_max, on_trackbar6 );
     createTrackbar( "Kp r: ", WIN_NAME, &kpr_slider, slider_max, on_trackbar7 );
     createTrackbar( "Kd r: ", WIN_NAME, &kdr_slider, slider_max, on_trackbar8 );
-    setMouseCallback(WIN_NAME, on_mouse,0);
-    VideoWriter vid;
-    vid.open("test.mpg",CV_FOURCC('P','I','M','1'),1/DT,Size(640,360));
     double time_start=(double)ros::Time::now().toSec();
     while (ros::ok() || ((double)ros::Time::now().toSec()< time_start+50)) {
     	ros::spinOnce();
@@ -469,15 +491,15 @@ int main(int argc, char **argv)
         Mat im;
         if (controller_updated)
         {
-            reg.Kp[X] = -(double)(kpx_slider)/(10*slider_max);
-            reg.Kd[X] = -(double)(kdx_slider)/(10*slider_max);
-            reg.Kp[Y] = (double)(kpy_slider)/(1000*slider_max);
-            reg.Kd[Y] = (double)(kdy_slider)/(1000*slider_max);
-            reg.Kp[Z] = (double)(kpz_slider)/(100*slider_max);
-            reg.Kd[Z] = (double)(kdz_slider)/(100*slider_max);
-            reg.Kp[ROT] = (double)(kpr_slider)/(slider_max);
-            reg.Kd[ROT] = (double)(kdr_slider)/(slider_max);
-
+            reg.Kp[X] = (double)(kpx_slider)/(X_SLIDER_WEIGHT*slider_max);
+            reg.Kd[X] = (double)(kdx_slider)/(X_SLIDER_WEIGHT*slider_max);
+            reg.Kp[Y] = (double)(kpy_slider)/(Y_SLIDER_WEIGHT*slider_max);
+            reg.Kd[Y] = (double)(kdy_slider)/(Y_SLIDER_WEIGHT*slider_max);
+            reg.Kp[Z] = (double)(kpz_slider)/(Z_SLIDER_WEIGHT*slider_max);
+            reg.Kd[Z] = (double)(kdz_slider)/(Z_SLIDER_WEIGHT*slider_max);
+            reg.Kp[ROT] = (double)(kpr_slider)/(ROT_SLIDER_WEIGHT*slider_max);
+            reg.Kd[ROT] = (double)(kdr_slider)/(ROT_SLIDER_WEIGHT*slider_max);
+            reg.saveController();
         }
         //If loop flag is set, reuse initial image (for debugging purposes)
         if (loop_flag) im0.copyTo(im);
@@ -503,8 +525,9 @@ int main(int argc, char **argv)
         vid.write(im);
         if(key == 'q') break;
         else if (key == 'k'){
-            reg.reset();
-            break;
+            reg.auto_hover();
+            setTarget(&ic, &reg, &cmt, &im0, &vid);
+            continue;
         }
         reg.logData();
         //TODO: Provide meaningful output
