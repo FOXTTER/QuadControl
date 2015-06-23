@@ -155,7 +155,7 @@ namespace controller
   	target[ROT] = 0;
   }
   void Controller::setTargetRect(Rect rect){
-  	target[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
+  	target[X] = sqrt((PIXEL_DIST_X*2*PIXEL_DIST_Y*2)/(rect.width*rect.height));
   }
 
   void Controller::auto_hover(){
@@ -166,8 +166,8 @@ namespace controller
 	void Controller::update_state(Point2f center, Rect rect)
 	{
 		//Kun til front kamera
-		measured[ROT] = atan(((center.x-PIXEL_DIST_Y)*tan(1.047/2))/(PIXEL_DIST_Y/2));
-		measured[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
+		measured[ROT] = atan(((center.x-PIXEL_DIST_Y)*tan(1.047/2))/(PIXEL_DIST_Y));
+		measured[X] = sqrt((PIXEL_DIST_X*2*PIXEL_DIST_Y*2)/(rect.width*rect.height));
 		measured[Y] = measured[Y]+ FILTER_WEIGHT*((center.x-PIXEL_DIST_Y)-measured[Y]);
 		measured[Z] = measured[Z]+ FILTER_WEIGHT*(((center.y-PIXEL_DIST_X)+sin(msg_in_global.rotY*3.14/180)*FOCAL_LENGTH_X)-measured[Z]); 
 		measuredRaw[Y] = center.x-PIXEL_DIST_Y;
