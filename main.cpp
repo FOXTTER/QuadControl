@@ -360,11 +360,11 @@ int main(int argc, char **argv)
         setTarget(&ic, &reg, &cmt, &im0, &vid, r);
     }
     int frame = 0;
-    loadPID(&reg);
+
     //Read PID values
-
-
-    //Main loop
+    loadPID(&reg);
+    
+    //Create trackbars
     createTrackbar( "Kp x: ", WIN_NAME, &kpx_slider, slider_max, on_trackbar1 );
     createTrackbar( "Kd x: ", WIN_NAME, &kdx_slider, slider_max, on_trackbar2 );
     createTrackbar( "Kp y: ", WIN_NAME, &kpy_slider, slider_max, on_trackbar3 );
@@ -373,7 +373,7 @@ int main(int argc, char **argv)
     createTrackbar( "Kd z: ", WIN_NAME, &kdz_slider, slider_max, on_trackbar6 );
     createTrackbar( "Kp r: ", WIN_NAME, &kpr_slider, slider_max, on_trackbar7 );
     createTrackbar( "Kd r: ", WIN_NAME, &kdr_slider, slider_max, on_trackbar8 );
-
+    //Main loop
     while (ros::ok()) {
     	ros::spinOnce();
         frame++;

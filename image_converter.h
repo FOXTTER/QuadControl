@@ -23,9 +23,7 @@ namespace image_converter
 	  ros::NodeHandle nh_;
 	  image_transport::ImageTransport it_;
 	  image_transport::Subscriber image_sub_;
-	  image_transport::Publisher image_pub_;
 	  Mat src1;
-	  int testCount;
 	  ImageConverter();
 	
 	  ~ImageConverter();

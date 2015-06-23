@@ -20,11 +20,9 @@ namespace image_converter
   ImageConverter::ImageConverter()
     : it_(nh_)
   {
-    testCount = 0;
     // Subscrive to input video feed and publish output video feed
     image_sub_ = it_.subscribe(IMAGE_PATH, 1, 
       &ImageConverter::imageCb, this);
-  
   }
 
   ImageConverter::~ImageConverter()
@@ -42,7 +40,6 @@ namespace image_converter
   double data[] = { 8.0617692817080149e+02, 0., 3.1935989457565023e+02, 0.,8.0304475206552934e+02, 1.8492321512613066e+02, 0., 0., 1. };
   void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg)
   {
-    testCount++;
     cv_bridge::CvImagePtr cv_ptr;
     try
     {
@@ -54,11 +51,6 @@ namespace image_converter
       return;
     }
 
-    // Draw an example circle on the video stream
-    //if (cv_ptr->image.rows > 60 && cv_ptr->image.cols > 60)
-    //  cv::circle(cv_ptr->image, cv::Point(50, 50), 10, CV_RGB(255,0,0));
-    
-    
     src1 = cv_ptr->image;
     Mat temp = src1.clone();
     undistort(temp, src1, cameraMatrix, distCoeffs);
