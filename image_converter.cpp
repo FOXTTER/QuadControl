@@ -17,14 +17,6 @@
 
 namespace image_converter
 {
-  //image_transport::Subscriber image_sub_;
-  //ros::NodeHandle nh_;
-  //image_transport::ImageTransport it_;
-  //image_transport::Subscriber image_sub_;
-  //image_transport::Publisher image_pub_;
-  
-  //Mat src1;
-  //int testCount;
   ImageConverter::ImageConverter()
     : it_(nh_)
   {
@@ -32,14 +24,20 @@ namespace image_converter
     // Subscrive to input video feed and publish output video feed
     image_sub_ = it_.subscribe(IMAGE_PATH, 1, 
       &ImageConverter::imageCb, this);
-    image_pub_ = it_.advertise("/image_converter/output_video", 1);
   
-    //cv::namedWindow(OPENCV_WINDOW);
   }
 
   ImageConverter::~ImageConverter()
   {
-    //cv::destroyWindow(OPENCV_WINDOW);w
+  }
+
+  Mat cameraMatrix;
+  Mat distCoeffs;
+  void ImageConverter::loadCalibration(){
+    FileStorage fs("calib.xml",FileStorage::READ);
+    fs["cameraMatrix"] >> cameraMatrix;
+    fs["distCoeffs"] >> distCoeffs;
+    fs.release();
   }
   double data[] = { 8.0617692817080149e+02, 0., 3.1935989457565023e+02, 0.,8.0304475206552934e+02, 1.8492321512613066e+02, 0., 0., 1. };
   void ImageConverter::imageCb(const sensor_msgs::ImageConstPtr& msg)
@@ -63,24 +61,6 @@ namespace image_converter
     
     src1 = cv_ptr->image;
     Mat temp = src1.clone();
-    Mat cameraMatrix;
-    Mat distCoeffs;
-    FileStorage fs("calib.xml",FileStorage::READ);
-    fs["cameraMatrix"] >> cameraMatrix;
-    fs["distCoeffs"] >> distCoeffs;
-    fs.release();
     undistort(temp, src1, cameraMatrix, distCoeffs);
-    //Remove light
-    //inRange(src1, Scalar( 0 , 0, 0), Scalar(180, 255, 250), temp );
-    //cvtColor(temp,temp,COLOR_GRAY2BGR);
-    //bitwise_and(src1,temp,src1);
-    //bitwise_not ( temp, temp);
-    //inpaint(src1, temp, src1, 10, INPAINT_NS);
-    // Update GUI Window
-    //cv::imshow(OPENCV_WINDOW, cv_ptr->image);
-    cv::waitKey(3);
-    
-    // Output modified video stream
-    image_pub_.publish(cv_ptr->toImageMsg());
   }
 }

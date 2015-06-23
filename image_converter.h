@@ -29,6 +29,7 @@ namespace image_converter
 	  ImageConverter();
 	
 	  ~ImageConverter();
+	  void loadCalibration();
 	
 	  void imageCb(const sensor_msgs::ImageConstPtr& msg);
 	};

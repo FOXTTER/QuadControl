@@ -70,6 +70,7 @@ namespace controller
 	,measured(4,0.0)
   ,measuredRaw(4,0.0)
 	{
+    //In order to use predefine PID values uncomment this
 		//Kp[X] = KP_X;
 		//Kp[Y] = KP_Y;
 		//Kp[ROT] = KP_ROT;
@@ -192,10 +193,6 @@ namespace controller
   //Filtered data
 	void Controller::update_state(Point2f center, Rect rect)
 	{
-		//measured[X] = measured[X]+ FILTER_WEIGHT*(getPosX(center.y-PIXEL_DIST_X)-measured[X]); 
-		//measured[Y] = measured[Y]+ FILTER_WEIGHT*(getPosY(center.x-PIXEL_DIST_Y)-measured[Y]);
-		//measured[X] = getPosX(center.y-PIXEL_DIST_X);
-		//measured[Y] = getPosY(center.x-PIXEL_DIST_Y);
 		//Kun til front kamera
 		measured[ROT] = atan(((center.x-PIXEL_DIST_Y)*tan(1.047/2))/(PIXEL_DIST_Y/2));
 		measured[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
@@ -203,12 +200,6 @@ namespace controller
 		measured[Z] = measured[Z]+ FILTER_WEIGHT*(((center.y-PIXEL_DIST_X)+sin(msg_in_global.rotY*3.14/180)*FOCAL_LENGTH_X)-measured[Z]); 
 		measuredRaw[Y] = center.x-PIXEL_DIST_Y;
     measuredRaw[Z] = (center.y-PIXEL_DIST_X)+sin(msg_in_global.rotY*3.14/180)*FOCAL_LENGTH_X;
-
-    //ROS_INFO("DEBUG: %g",measured[Y]);
-		//Den fancy måde
-		//measured[Y] = center.x/PIXEL_DIST_Y;
-		//measured[Z] = center.y/PIXEL_DIST_X;
-		//measured[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
 	}
 
 	void Controller::control(double dt)
@@ -224,39 +215,6 @@ namespace controller
       		output[i] = Kp[i]*error[i] + Ki[i] * integral[i] + Kd[i] * derivative[i];
       		previous_error[i] = error[i];
     	}
-
-      	//Eksperimentiel
-      	/*
-      	error[X] = (measured[X] - target[X])*sqrt(0.006)*sqrt((alfa_u*alfa_v)/(PIXEL_DIST_X*PIXEL_DIST_Y));
-      	error[Y] = (measured[Y] - target[Y])*2*PIXEL_DIST_X/alfa_u;
-      	error[ROT] = (measured)
-      	for(int i = 0; i < 4; i++)
-	 	{
-      		if (output[i] < 1 && output[i] > -1)
-      		{
-      			integral[i] = integral[i] + error[i] * dt;
-      		}
-      		derivative[i] = (error[i]-previous_error[i])/dt;
-      		output[i] = Kp[i]*error[i] + Ki[i] * integral[i] + Kd[i] * derivative[i];
-      		previous_error[i] = error[i];
-    	}*/
-    	/*if (output[X] > 0.1)
-    	{
-    		output[X] = 0.1;
-    	}
-    	if (output[X] < -0.1)
-    	{
-    		output[X] = -0.1;
-    	}
-    	if (output[Y] > 0.1)
-    	{
-    		output[Y] = 0.1;
-    	}
-    	if (output[Y] < -0.1)
-    	{
-    		output[Y] = -0.1;
-    	}
-    	*/
 
     	twist_msg.angular.z= output[ROT];
     	twist_msg.linear.x = output[X];

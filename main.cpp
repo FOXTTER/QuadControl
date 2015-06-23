@@ -61,6 +61,7 @@ using namespace controller;
 #define Y_SLIDER_WEIGHT 1000
 #define Z_SLIDER_WEIGHT 100
 #define ROT_SLIDER_WEIGHT 2
+#define SUCCESS_RATIO 0.3
 
 static string WIN_NAME = "CMT";
 
@@ -252,10 +253,16 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test");
     ImageConverter ic;
+    ic.loadCalibration();
     Controller reg;
     ros::Rate r(1/DT); // 10 hz
     ros::spinOnce();
-    system("rosservice call /ardrone/flattrim");
+    if(!system("rosservice call /ardrone/flattrim")){
+        ROS_INFO("Drone calibrated");
+    }else{
+        ROS_ERROR("Error calibrating drone");
+        return 0;
+    }
     //Create a CMT object
     reg.wait(1.0);
 
@@ -265,14 +272,11 @@ int main(int argc, char **argv)
     Rect rect;
 
     //Parse args
-    int challenge_flag = 0;
-    int loop_flag = 0;
     int verbose_flag = 0;
     string input_path;
 
     const int detector_cmd = 1000;
     const int descriptor_cmd = 1001;
-    const int bbox_cmd = 1002;
     const int no_scale_cmd = 1003;
     const int with_rotation_cmd = 1004;
     const int remember_last = 1005;
@@ -280,11 +284,8 @@ int main(int argc, char **argv)
     struct option longopts[] =
     {
         //No-argument options
-        {"challenge", no_argument, &challenge_flag, 1},
-        {"loop", no_argument, &loop_flag, 1},
         {"verbose", no_argument, &verbose_flag, 1},
         //Argument options
-        {"bbox", required_argument, 0, bbox_cmd},
         {"detector", required_argument, 0, detector_cmd},
         {"descriptor", required_argument, 0, descriptor_cmd},
         {"no-scale", no_argument, 0, no_scale_cmd},
@@ -301,22 +302,6 @@ int main(int argc, char **argv)
         {
             case 'v':
                 verbose_flag = true;
-                break;
-            case bbox_cmd:
-                {
-                    //TODO: The following also accepts strings of the form %f,%f,%f,%fxyz...
-                    string bbox_format = "%f,%f,%f,%f";
-                    float x,y,w,h;
-                    int ret = sscanf(optarg, bbox_format.c_str(), &x, &y, &w, &h);
-                    if (ret != 4)
-                    {
-                        cerr << "bounding box must be given in format " << bbox_format << endl;
-                        return 1;
-                    }
-
-                    bbox_flag = 1;
-                    rect = Rect(x,y,w,h);
-                }
                 break;
             case detector_cmd:
                 cmt.str_detector = optarg;
@@ -339,100 +324,9 @@ int main(int argc, char **argv)
 
     }
 
-    //One argument remains
-    if (optind == argc - 1)
-    {
-        input_path = argv[optind];
-    }
-
-    else if (optind < argc - 1)
-    {
-        cerr << "Only one argument is allowed." << endl;
-        return 1;
-    }
-
     //Set up logging
     FILELog::ReportingLevel() = verbose_flag ? logDEBUG : logINFO;
     Output2FILE::Stream() = stdout; //Log to stdout
-
-    //Challenge mode
-    if (challenge_flag)
-    {
-        //Read list of images
-        ifstream im_file("images.txt");
-        vector<string> files;
-        string line;
-        while(getline(im_file, line ))
-        {
-            files.push_back(line);
-        }
-
-        //Read region
-        ifstream region_file("region.txt");
-        vector<float> coords = getNextLineAndSplitIntoFloats(region_file);
-
-        if (coords.size() == 4) {
-            rect = Rect(coords[0], coords[1], coords[2], coords[3]);
-        }
-
-        else if (coords.size() == 8)
-        {
-            //Split into x and y coordinates
-            vector<float> xcoords;
-            vector<float> ycoords;
-
-            for (size_t i = 0; i < coords.size(); i++)
-            {
-                if (i % 2 == 0) xcoords.push_back(coords[i]);
-                else ycoords.push_back(coords[i]);
-            }
-
-            float xmin = *min_element(xcoords.begin(), xcoords.end());
-            float xmax = *max_element(xcoords.begin(), xcoords.end());
-            float ymin = *min_element(ycoords.begin(), ycoords.end());
-            float ymax = *max_element(ycoords.begin(), ycoords.end());
-
-            rect = Rect(xmin, ymin, xmax-xmin, ymax-ymin);
-            cout << "Found bounding box" << xmin << " " << ymin << " " <<  xmax-xmin << " " << ymax-ymin << endl;
-        }
-
-        else {
-            cerr << "Invalid Bounding box format" << endl;
-            return 0;
-        }
-
-        //Read first image
-        Mat im0 = imread(files[0]);
-        Mat im0_gray;
-        cvtColor(im0, im0_gray, CV_BGR2GRAY);
-
-        //Initialize cmt
-        cmt.initialize(im0_gray, rect);
-
-        //Write init region to output file
-        ofstream output_file("output.txt");
-        output_file << rect.x << ',' << rect.y << ',' << rect.width << ',' << rect.height << std::endl;
-
-        //Process images, write output to file
-        for (size_t i = 1; i < files.size(); i++)
-        {
-            FILE_LOG(logINFO) << "Processing frame " << i << "/" << files.size();
-            Mat im = imread(files[i]);
-            Mat im_gray;
-            cvtColor(im, im_gray, CV_BGR2GRAY);
-            cmt.processFrame(im_gray);
-            if (verbose_flag)
-            {
-                display(im, cmt);
-            }
-            rect = cmt.bb_rot.boundingRect();
-            output_file << rect.x << ',' << rect.y << ',' << rect.width << ',' << rect.height << std::endl;
-        }
-
-        output_file.close();
-
-        return 0;
-    }
 
     //Normal mode
 
@@ -479,15 +373,10 @@ int main(int argc, char **argv)
     createTrackbar( "Kd z: ", WIN_NAME, &kdz_slider, slider_max, on_trackbar6 );
     createTrackbar( "Kp r: ", WIN_NAME, &kpr_slider, slider_max, on_trackbar7 );
     createTrackbar( "Kd r: ", WIN_NAME, &kdr_slider, slider_max, on_trackbar8 );
-    double time_start=(double)ros::Time::now().toSec();
-    while (ros::ok() || ((double)ros::Time::now().toSec()< time_start+50)) {
+
+    while (ros::ok()) {
     	ros::spinOnce();
         frame++;
-
-        if ((double)ros::Time::now().toSec() > time_start+7)
-        {
-            reg.target[ROT] = 0.65;
-        }
         Mat im;
         if (controller_updated)
         {
@@ -501,9 +390,8 @@ int main(int argc, char **argv)
             reg.Kd[ROT] = (double)(kdr_slider)/(ROT_SLIDER_WEIGHT*slider_max);
             reg.saveController();
         }
-        //If loop flag is set, reuse initial image (for debugging purposes)
-        if (loop_flag) im0.copyTo(im);
-        else im = ic.src1;//cap >> im; //Else use next image in stream
+        
+        im = ic.src1;
 
         Mat im_gray;
         cvtColor(im, im_gray, CV_BGR2GRAY);
@@ -515,7 +403,7 @@ int main(int argc, char **argv)
         line(im, Point(0,180),Point(640,180),Scalar(0,255,0),1,8,0);
         line(im, Point(320,0),Point(320,360),Scalar(0,255,0),1,8,0);
         reg.update_state(center, box);
-        if(cmt.ratio > 0.3) {
+        if(cmt.ratio > SUCCESS_RATIO) {
             drawText(im,"Target lockon",0);
             reg.control(DT);
         } else {
