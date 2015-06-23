@@ -60,7 +60,7 @@ using namespace controller;
 #define X_SLIDER_WEIGHT -10
 #define Y_SLIDER_WEIGHT 1000
 #define Z_SLIDER_WEIGHT 100
-#define ROT_SLIDER_WEIGHT 1
+#define ROT_SLIDER_WEIGHT 2
 
 static string WIN_NAME = "CMT";
 
@@ -120,6 +120,7 @@ static void on_mouse( int event, int x, int y, int, void* )
 {
     if(event == EVENT_RBUTTONDOWN) {
         Controller reg;
+        reg.auto_hover();
         reg.land();
         throw exception();
         return;
@@ -232,13 +233,6 @@ void drawText(Mat img, string text,int c){
     double fontScale = 1;
     int thickness = 3;
     
-    
-    
-    int baseline=0;
-    Size textSize = getTextSize(text, fontFace,
-                                fontScale, thickness, &baseline);
-    baseline += thickness;
-    
     // center the text
     Point textOrg(0,320);
     
@@ -274,7 +268,6 @@ int main(int argc, char **argv)
     int challenge_flag = 0;
     int loop_flag = 0;
     int verbose_flag = 0;
-    int bbox_flag = 0;
     string input_path;
 
     const int detector_cmd = 1000;
@@ -447,42 +440,18 @@ int main(int argc, char **argv)
     namedWindow(WIN_NAME);
     setMouseCallback(WIN_NAME, on_mouse,0);
 
-    VideoCapture cap;
-
-    bool show_preview = true;
-
-    /*//If no input was specified
-    if (input_path.length() == 0)
-    {
-        cap.open(0); //Open default camera device
-    }
-
-    //Else open the video specified by input_path
-    else
-    {
-        cap.open(input_path);
-        show_preview = false;
-    }
-
-    //If it doesn't work, stop
-    if(!cap.isOpened())
-    {
-        cerr << "Unable to open video capture." << endl;
-        return -1;
-    }*/
-
     //Reset quadcopter
     reg.init();
     //Takeoff
     reg.takeoff();
-    reg.elevate(1000);
+    //reg.elevate(1000);
     reg.auto_hover();
-    //reg.setTargetRot();
+    reg.setTargetRot();
 
     //Show preview until key is pressed
     Mat im0;
     VideoWriter vid;
-    vid.open("test.avi",CV_FOURCC('D', 'I', 'V', '3'),1/DT,Size(640,360));
+    vid.open("test.avi",CV_FOURCC('U', '2', '6', '3'),1/DT,Size(640,360));
     if (last_flag)
     {
         Mat im0_gray;
@@ -515,6 +484,10 @@ int main(int argc, char **argv)
     	ros::spinOnce();
         frame++;
 
+        if ((double)ros::Time::now().toSec() > time_start+7)
+        {
+            reg.target[ROT] = 0.65;
+        }
         Mat im;
         if (controller_updated)
         {
@@ -557,12 +530,15 @@ int main(int argc, char **argv)
             reg.auto_hover();
             setTarget(&ic, &reg, &cmt, &im0, &vid, r);
             continue;
+        }else if (key == 'c'){
+            imwrite("im.png",im);
         }
         reg.logData();
         //TODO: Provide meaningful output
         FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
         FILE_LOG(logINFO) << "#" << frame << " total: " << cmt.points_total;
         FILE_LOG(logINFO) << "#" << frame << " ratio: " << cmt.ratio;
+        ROS_INFO("Target: %g",reg.target[Z]);
         r.sleep();
     }
     reg.land();

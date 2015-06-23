@@ -53,22 +53,9 @@ namespace controller
 	  FILE* pFile = fopen("quadlog.txt", "a");
 	  fprintf(pFile, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measured[X],measured[Y],measured[Z],measured[ROT],
       output[X],output[Y],output[Z],output[ROT],error[X],error[Y],error[Z],error[ROT]);
-	  fclose(pFile);
+	  //fprintf(pFile,"%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measuredRaw[Y],measured[Y],measuredRaw[Z],measuredRaw[Z]);
+    fclose(pFile);
 	}
-
-	struct Foo
-	{
-	  class Request
-	  {
-	  };
-	
-	  class Response
-	  {
-	  };
-	
-	  Request request;
-	  Response response;
-	};
 
 	Controller::Controller()
 	:previous_error(4,0.0)
@@ -81,6 +68,7 @@ namespace controller
 	,Ki(4,0.0)
 	,Kd(4,0.0)
 	,measured(4,0.0)
+  ,measuredRaw(4,0.0)
 	{
 		//Kp[X] = KP_X;
 		//Kp[Y] = KP_Y;
@@ -209,11 +197,14 @@ namespace controller
 		//measured[X] = getPosX(center.y-PIXEL_DIST_X);
 		//measured[Y] = getPosY(center.x-PIXEL_DIST_Y);
 		//Kun til front kamera
-		measured[ROT] = atan(((center.x-PIXEL_DIST_Y)*tan(1.6/2))/(PIXEL_DIST_Y/2));
+		measured[ROT] = atan(((center.x-PIXEL_DIST_Y)*tan(1.047/2))/(PIXEL_DIST_Y/2));
 		measured[X] = sqrt((PIXEL_DIST_X*PIXEL_DIST_Y)/(rect.width*rect.height));
 		measured[Y] = measured[Y]+ FILTER_WEIGHT*((center.x-PIXEL_DIST_Y)-measured[Y]);
 		measured[Z] = measured[Z]+ FILTER_WEIGHT*(((center.y-PIXEL_DIST_X)+sin(msg_in_global.rotY*3.14/180)*FOCAL_LENGTH_X)-measured[Z]); 
-		//ROS_INFO("DEBUG: %g",measured[Y]);
+		measuredRaw[Y] = center.x-PIXEL_DIST_Y;
+    measuredRaw[Z] = (center.y-PIXEL_DIST_X)+sin(msg_in_global.rotY*3.14/180)*FOCAL_LENGTH_X;
+
+    //ROS_INFO("DEBUG: %g",measured[Y]);
 		//Den fancy måde
 		//measured[Y] = center.x/PIXEL_DIST_Y;
 		//measured[Z] = center.y/PIXEL_DIST_X;
