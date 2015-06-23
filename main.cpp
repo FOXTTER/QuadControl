@@ -257,12 +257,7 @@ int main(int argc, char **argv)
     Controller reg;
     ros::Rate r(1/DT); // 10 hz
     ros::spinOnce();
-    if(!system("rosservice call /ardrone/flattrim")){
-        ROS_INFO("Drone calibrated");
-    }else{
-        ROS_ERROR("Error calibrating drone");
-        return 0;
-    }
+    reg.calibrate();
     //Create a CMT object
     reg.wait(1.0);
 

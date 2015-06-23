@@ -61,9 +61,6 @@ namespace controller{
 			vector<double> measured;
 			vector<double> measuredRaw;
 			void nav_callback(const ardrone_autonomy::Navdata& msg_in);
-        	struct Foo;
-            double getPosX(int pixErrorX);
-            double getPosY(int pixErrorY);
             double start_time;
 	};
 }

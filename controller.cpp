@@ -52,7 +52,6 @@ namespace controller
 	  FILE* pFile = fopen("quadlog.txt", "a");
 	  fprintf(pFile, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measured[X],measured[Y],measured[Z],measured[ROT],
       output[X],output[Y],output[Z],output[ROT],error[X],error[Y],error[Z],error[ROT]);
-	  //fprintf(pFile,"%g,%g,%g,%g,%g\n",(double)ros::Time::now().toSec()-start_time,measuredRaw[Y],measured[Y],measuredRaw[Z],measuredRaw[Z]);
     fclose(pFile);
 	}
 
@@ -90,8 +89,7 @@ namespace controller
 		pub_empty_takeoff.publish(emp_msg);
 	}
 	void Controller::calibrate(){
-		//Controller::Foo foo;
-		//ros::service::call("/ardrone/flattrim",foo);
+    (void) system("rosservice call /ardrone/flattrim");
 	}
 	void Controller::wait(double tid){
 		double time_start=(double)ros::Time::now().toSec();
