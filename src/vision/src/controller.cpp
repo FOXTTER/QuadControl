@@ -194,7 +194,7 @@ namespace controller
     twist_msg.linear.z = output[Z];
 
     pub_twist.publish(twist_msg);
-
+    //Debug values
     ROS_INFO("Measured pos = (%g,%g)",measured[X],measured[Y]);
     ROS_INFO("Output x: %g", output[X]);
   	ROS_INFO("Output y: %g", output[Y]);

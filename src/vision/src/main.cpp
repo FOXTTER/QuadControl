@@ -10,7 +10,7 @@
 #include <fstream>
 #include <cstdio>
 
-//Vores libraries
+//ROS and OpenCV dependencies
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
@@ -20,7 +20,6 @@
 #include <geometry_msgs/Twist.h>
 #include <cv.h>
 #include <highgui.h>
-//#include <stdio.h>
 #include <string>
 #include <math.h>
 
@@ -52,7 +51,8 @@ using namespace cv;
 using namespace std;
 using namespace image_converter;
 using namespace controller;
-#define DT 0.05
+
+#define DT 0.05 //Time constant for the refresh rate 0.05 = 20 Hz
 #define X 0
 #define Y 1
 #define ROT 2
@@ -63,7 +63,7 @@ using namespace controller;
 #define ROT_SLIDER_WEIGHT 2
 #define SUCCESS_RATIO 0.3
 
-static string WIN_NAME = "CMT";
+static string WIN_NAME = "QuadControl";
 
 /// Matrices to store images
 
@@ -78,23 +78,6 @@ int kdz_slider = 0;
 int kpr_slider = 0;
 int kdr_slider = 0;
 bool controller_updated = false;
-
-
-
-vector<float> getNextLineAndSplitIntoFloats(istream& str)
-{
-    vector<float>   result;
-    string                line;
-    getline(str,line);
-
-    stringstream          lineStream(line);
-    string                cell;
-    while(getline(lineStream,cell,','))
-    {
-        result.push_back(atof(cell.c_str()));
-    }
-    return result;
-}
 
 int display(Mat im, CMT & cmt)
 {
@@ -126,8 +109,6 @@ static void on_mouse( int event, int x, int y, int, void* )
         throw exception();
         return;
     }
-    if( event != EVENT_LBUTTONDOWN )
-        return;
 }
 
 void loadTarget(Mat* im, Rect* rect){
@@ -152,11 +133,9 @@ Rect setTarget(ImageConverter* ic, Controller* reg, CMT* cmt, Mat* im0, VideoWri
     {
         ros::spinOnce();
         Mat preview;
-        //cap >> preview;
         preview = ic->src1;
         screenLog(preview, "Press a key to start selecting an object.");
         imshow(WIN_NAME, preview);
-        //ROS_INFO("Count: %d",ic.testCount);
         vid->write(preview);
         char k = waitKey(10);
         if (k != -1) {
@@ -166,7 +145,6 @@ Rect setTarget(ImageConverter* ic, Controller* reg, CMT* cmt, Mat* im0, VideoWri
     }
 
     //Get initial image
-    //cap >> im0;
     (*im0) = ic->src1.clone();
     //Get bounding box from user
     rect = getRect((*im0), WIN_NAME);
@@ -181,6 +159,7 @@ Rect setTarget(ImageConverter* ic, Controller* reg, CMT* cmt, Mat* im0, VideoWri
     //Initialize CMT
     cmt->initialize(im0_gray, rect);
     setMouseCallback(WIN_NAME, on_mouse,0);
+    //Save the target for persistency
     saveTarget(im0_gray,rect);
     return rect;
 }
@@ -197,6 +176,7 @@ void loadPID(Controller * reg){
     kdr_slider = reg->Kd[ROT]*ROT_SLIDER_WEIGHT*slider_max;
 }
 
+// Maybe combine them and only use one?
 void on_trackbar1( int, void* )
 {
     controller_updated = true;
@@ -229,6 +209,8 @@ void on_trackbar8( int, void* )
 {
     controller_updated = true;
 }
+
+
 void drawText(Mat img, string text,int c){
     int fontFace = FONT_HERSHEY_SIMPLEX;
     double fontScale = 1;
@@ -241,26 +223,28 @@ void drawText(Mat img, string text,int c){
     if (c == 0)
     {
         putText(img, text, textOrg, fontFace, fontScale,
-            Scalar(0,255,0), thickness, 8);
+            Scalar(0,255,0), thickness, 8); //Green text
     }
     else{
         putText(img, text, textOrg, fontFace, fontScale,
-            Scalar(0,0,255), thickness, 8);
+            Scalar(0,0,255), thickness, 8); //Red text
     }
 }
 bool last_flag = false;
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "test");
+    //Create the image converter between ros and OpenCV
     ImageConverter ic;
     ic.loadCalibration();
+    //Create controller object
     Controller reg;
-    ros::Rate r(1/DT); // 10 hz
+    ros::Rate r(1/DT);
     ros::spinOnce();
     reg.calibrate();
-    //Create a CMT object
+    //Wait one second for initilization of AR drone
     reg.wait(1.0);
-
+    //Create a CMT object
     CMT cmt;
 
     //Initialization bounding box
@@ -268,7 +252,6 @@ int main(int argc, char **argv)
 
     //Parse args
     int verbose_flag = 0;
-    string input_path;
 
     const int detector_cmd = 1000;
     const int descriptor_cmd = 1001;
@@ -333,6 +316,7 @@ int main(int argc, char **argv)
     reg.init();
     //Takeoff
     reg.takeoff();
+    //If the altitude is too low you can set an desired start altitude here
     //reg.elevate(1000);
     reg.auto_hover();
     reg.setTargetRot();
@@ -341,6 +325,7 @@ int main(int argc, char **argv)
     Mat im0;
     VideoWriter vid;
     vid.open("test.avi",CV_FOURCC('U', '2', '6', '3'),1/DT,Size(640,360));
+    //If tracking of the last target is desired load it
     if (last_flag)
     {
         Mat im0_gray;
@@ -373,6 +358,7 @@ int main(int argc, char **argv)
     	ros::spinOnce();
         frame++;
         Mat im;
+        //Update the live tuning of the controllers
         if (controller_updated)
         {
             reg.Kp[X] = (double)(kpx_slider)/(X_SLIDER_WEIGHT*slider_max);
@@ -385,7 +371,7 @@ int main(int argc, char **argv)
             reg.Kd[ROT] = (double)(kdr_slider)/(ROT_SLIDER_WEIGHT*slider_max);
             reg.saveController();
         }
-        
+        // Load the current frame from the image converter
         im = ic.src1;
 
         Mat im_gray;
@@ -397,7 +383,10 @@ int main(int argc, char **argv)
         circle( im, center, 5, Scalar(0,0,255), -1, 8, 0 );
         line(im, Point(0,180),Point(640,180),Scalar(0,255,0),1,8,0);
         line(im, Point(320,0),Point(320,360),Scalar(0,255,0),1,8,0);
+        //Load the current position of the drone
         reg.update_state(center, box);
+
+        //Is the target visible or good enough quality? otherwise hover
         if(cmt.ratio > SUCCESS_RATIO) {
             drawText(im,"Target lockon",0);
             reg.control(DT);
@@ -405,7 +394,7 @@ int main(int argc, char **argv)
             drawText(im,"Target lost",1);
             reg.auto_hover();
         }
-
+        //Display and log the current frame
         char key = display(im, cmt);
         vid.write(im);
         if(key == 'q') break;
@@ -417,13 +406,13 @@ int main(int argc, char **argv)
             imwrite("im.png",im);
         }
         reg.logData();
-        //TODO: Provide meaningful output
+        //Debug output
         FILE_LOG(logINFO) << "#" << frame << " active: " << cmt.points_active.size();
         FILE_LOG(logINFO) << "#" << frame << " total: " << cmt.points_total;
         FILE_LOG(logINFO) << "#" << frame << " ratio: " << cmt.ratio;
-        ROS_INFO("Target: %g",reg.target[Z]);
         r.sleep();
     }
+    //If the loop is exited land the drone
     reg.land();
 
     return 0;
