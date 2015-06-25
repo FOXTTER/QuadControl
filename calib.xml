@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<opencv_storage>
+<calibrationDate>"Fri May 09 17:12:58 2014&#x0a;"</calibrationDate>
+<cameraMatrix type_id="opencv-matrix">
+    <rows>3</rows>
+    <cols>3</cols>
+    <dt>d</dt>
+    <data>
+        8.0617692817080149e+02 0. 3.1935989457565023e+02 0.
+        8.0304475206552934e+02 1.8492321512613066e+02 0. 0. 1.</data></cameraMatrix>
+<distCoeffs type_id="opencv-matrix">
+    <rows>5</rows>
+    <cols>1</cols>
+    <dt>d</dt>
+    <data>
+        -1.0699467141692971e+00 1.6349131857432895e+00
+         6.5095747876283321e-03 1.1007288454251071e-02
+        -1.1615026080978532e+00</data></distCoeffs>
+</opencv_storage>

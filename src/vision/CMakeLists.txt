@@ -1,0 +1,63 @@
+project (CMT)
+
+cmake_minimum_required (VERSION 2.6)
+
+option(BUILD_TRAX_CLIENT "Build the trax client." OFF)
+
+find_package(OpenCV REQUIRED)
+
+find_package(catkin REQUIRED COMPONENTS
+  cv_bridge
+  image_transport
+  roscpp
+  rospy
+  sensor_msgs
+  std_msgs
+)
+
+catkin_package(
+#  INCLUDE_DIRS include
+#  LIBRARIES quad_cam
+  CATKIN_DEPENDS cv_bridge image_transport roscpp rospy sensor_msgs std_msgs
+  DEPENDS system_lib
+)
+include_directories(include)
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+add_definitions ("-Wall")
+
+add_executable (cmt src/common.cpp src/gui.cpp src/image_converter.cpp src/controller.cpp src/main.cpp
+    src/CMT.cpp src/Consensus.cpp src/Fusion.cpp src/Matcher.cpp src/Tracker.cpp
+    src/fastcluster/fastcluster.cpp)
+
+target_link_libraries(cmt 
+${OpenCV_LIBS}
+${catkin_LIBRARIES}
+)
+install(TARGETS cmt cmt
+   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
+
+if(BUILD_TRAX_CLIENT)
+    set(TRAX_DIR "" CACHE FILEPATH "Path to trax")
+
+    include_directories(${TRAX_DIR}/include)
+
+    add_executable (trax_client cmt common.cpp gui.cpp trax.cpp
+        CMT.cpp Consensus.cpp Fusion.cpp Matcher.cpp Tracker.cpp
+        fastcluster/fastcluster.cpp)
+
+    find_library(TRAX_LIBRARY NAMES trax HINTS "${TRAX_DIR}/lib")
+
+    target_link_libraries(trax_client ${OpenCV_LIBS} ${TRAX_LIBRARY})
+
+endif()
+
